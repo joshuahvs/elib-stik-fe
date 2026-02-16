@@ -19,6 +19,7 @@ Aplikasi ini berfungsi sebagai antarmuka pengguna (User & Admin) yang terhubung 
 # 📁 Struktur Direktori
 
 Berikut adalah struktur direktori utama dalam repository:
+```
 ├── app/ # Routing utama (Next.js App Router)
 │ ├── (auth)/ # Halaman login & registrasi
 │ ├── dashboard/ # Dashboard admin
@@ -44,7 +45,7 @@ Berikut adalah struktur direktori utama dalam repository:
 ├── next.config.js
 ├── tailwind.config.ts
 └── package.json
-
+```
 ---
 
 # ⚙️ Environment Variables
