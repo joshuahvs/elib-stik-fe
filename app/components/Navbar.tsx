@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { API_URL } from "@/app/lib/api";
 
 export type NavbarItem = {
   label: string;
@@ -20,11 +21,20 @@ export default function Navbar({ items, menuItems }: NavbarProps) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  const [isAuthed, setIsAuthed] = useState<boolean>(() => {
+    // Optimistic initial value to avoid a flash after hydration.
+    // Still verified against backend below.
+    if (typeof window === "undefined") return false;
+    return Boolean(window.localStorage.getItem("token"));
+  });
+
   const navItems: NavbarItem[] = items ?? [
     { label: "Beranda", href: "/" },
     { label: "Koleksi", href: "#", disabled: true },
     { label: "Isi Buku Tamu", href: "#", disabled: true },
-    { label: "Akun", href: "/profile" },
+    isAuthed
+      ? { label: "Akun", href: "/profile" }
+      : { label: "Masuk", href: "/auth/login" },
   ];
 
   const hasMenu = Boolean(menuItems && menuItems.length > 0);
@@ -38,6 +48,51 @@ export default function Navbar({ items, menuItems }: NavbarProps) {
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (items) return; // if caller provides nav items, don't override/auth-check
+
+    let cancelled = false;
+
+    async function verify() {
+      const token = window.localStorage.getItem("token");
+      if (!token) {
+        if (!cancelled) setIsAuthed(false);
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_URL}/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) {
+          window.localStorage.removeItem("token");
+          if (!cancelled) setIsAuthed(false);
+          return;
+        }
+
+        if (!cancelled) setIsAuthed(true);
+      } catch {
+        // Network error: keep optimistic state based on token presence.
+        if (!cancelled) setIsAuthed(Boolean(token));
+      }
+    }
+
+    verify();
+
+    function onStorage(e: StorageEvent) {
+      if (e.key === "token") verify();
+    }
+
+    window.addEventListener("storage", onStorage);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [API_URL, items, pathname]);
 
   return (
     <header className="w-full bg-white border-b">
