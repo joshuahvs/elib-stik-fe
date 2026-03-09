@@ -42,14 +42,10 @@ export default function ProfilePage() {
           ...prev,
           namaLengkap:
             data?.nama_lengkap ??
-            data?.namaLengkap ??
-            data?.full_name ??
-            data?.fullName ??
-            data?.name ??
             prev.namaLengkap,
           username: data?.username ?? prev.username,
           email: data?.email ?? prev.email,
-          nomorTelepon: data?.phone ?? data?.nomor_telepon ?? prev.nomorTelepon,
+          nomorTelepon: data?.phone,
           tanggalLahir:
             data?.tanggal_lahir ?? data?.tanggalLahir ?? prev.tanggalLahir,
           nim: data?.nim ?? prev.nim,
@@ -86,8 +82,6 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Navbar />
-
       <main className="mx-auto max-w-6xl px-6 py-10">
         {!isLoading && !token ? (
           <div className="bg-white rounded-2xl shadow-xl p-8 md:p-10 max-w-xl mx-auto text-center">
