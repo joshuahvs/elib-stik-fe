@@ -6,11 +6,13 @@ import PrimaryButton from "@/app/components/PrimaryButton";
 import Navbar from "@/app/components/Navbar";
 import { API_URL } from "@/app/lib/api";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
+  const router = useRouter();
 
   const [form, setForm] = useState({
     namaLengkap: "Nama Lengkap",
@@ -120,8 +122,16 @@ export default function ProfilePage() {
                   </p>
                 ) : null}
 
-                <div className="mt-8 w-full max-w-sm">
+                <div className="mt-8 w-full max-w-sm flex flex-col gap-3">
                   <PrimaryButton type="button">Ubah Profil</PrimaryButton>
+
+                  <button
+                    type="button"
+                    onClick={() => router.push("/auth/logout")}
+                    className="h-12 w-full rounded-xl border border-slate-300 bg-white font-medium text-slate-900 hover:bg-slate-50"
+                  >
+                    Keluar
+                  </button>
                 </div>
               </div>
             </section>
