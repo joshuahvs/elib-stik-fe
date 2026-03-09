@@ -60,7 +60,6 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-white">
-
       <main className="mx-auto max-w-xl px-6 py-10">
         <div className="bg-white rounded-2xl shadow-xl p-8 md:p-10">
           <h1 className="text-2xl md:text-3xl font-bold text-center mb-6 text-slate-900">
@@ -81,6 +80,15 @@ export default function LoginPage() {
               placeholder="Password"
               onChange={handleChange}
             />
+
+            <div className="text-right">
+              <Link
+                href="/auth/forgot-password"
+                className="text-sm text-slate-600 hover:text-slate-900 underline"
+              >
+                Lupa password?
+              </Link>
+            </div>
           </div>
 
           <PrimaryButton onClick={handleLogin} type="button" className="mt-6">

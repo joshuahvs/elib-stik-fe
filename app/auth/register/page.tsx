@@ -6,12 +6,6 @@ import Link from "next/link";
 import Dropdown from "@/app/components/DropDown";
 import InputField from "@/app/components/InputField";
 import PrimaryButton from "@/app/components/PrimaryButton";
-// import svgPaths from "./svg-ixvtyevhx6";
-// import imgDivPageTitle from "figma:asset/d0c9d215a346aec1ae0c7a18cabe6d7b40d61a0d.png";
-// import imgEllipse1 from "figma:asset/55e34b03a7cad2686e88400e57a2c55497abfbb4.png";
-// import imgEllipse2 from "figma:asset/bc8f6993dee3236cf194e68c4b00b842f6bca899.png";
-// import imgEllipse3 from "figma:asset/2924c8ba64cb1119fe29c2aeb8dfa7caeef6b9df.png";
-// import imgSapiens from "figma:asset/8a522ab444d99d493144f6b25000c0afc4b34a09.png";
 
 export default function RegisterPage() {
   const roleOptions = useMemo(
@@ -26,6 +20,7 @@ export default function RegisterPage() {
   const [role, setRole] =
     useState<(typeof roleOptions)[number]["value"]>("mahasiswa");
   const [form, setForm] = useState({
+    nama_lengkap:"",
     username: "",
     phone: "",
     password: "",
@@ -65,6 +60,7 @@ export default function RegisterPage() {
     }
 
     const body: any = {
+      nama_lengkap: form.nama_lengkap,
       username: form.username,
       phone: form.phone,
       email: form.email,
@@ -87,17 +83,6 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <header className="w-full bg-white border-b">
-        <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
-          <div className="text-lg font-semibold text-slate-900">eLib</div>
-          <Link
-            href="/auth/login"
-            className="bg-black text-white px-5 py-2 rounded-full text-sm"
-          >
-            Masuk
-          </Link>
-        </div>
-      </header>
 
       <main className="mx-auto max-w-xl px-6 py-10">
         <div className="bg-white rounded-2xl shadow-xl p-8 md:p-10">
@@ -118,6 +103,12 @@ export default function RegisterPage() {
           </div>
 
           <div className="flex flex-col gap-4">
+            <InputField
+              name="nama_lengkap"
+              placeholder="Nama Lengkap"
+              onChange={handleChange}
+            />
+
             <InputField
               name="username"
               placeholder="Username"
