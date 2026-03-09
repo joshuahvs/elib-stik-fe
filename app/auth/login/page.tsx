@@ -60,18 +60,6 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <header className="w-full bg-white border-b">
-        <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
-          <div className="text-lg font-semibold text-slate-900">eLib</div>
-          <Link
-            href="/auth/register"
-            className="bg-black text-white px-5 py-2 rounded-full text-sm"
-          >
-            Daftar
-          </Link>
-        </div>
-      </header>
-
       <main className="mx-auto max-w-xl px-6 py-10">
         <div className="bg-white rounded-2xl shadow-xl p-8 md:p-10">
           <h1 className="text-2xl md:text-3xl font-bold text-center mb-6 text-slate-900">
@@ -92,6 +80,15 @@ export default function LoginPage() {
               placeholder="Password"
               onChange={handleChange}
             />
+
+            <div className="text-right">
+              <Link
+                href="/auth/forgot-password"
+                className="text-sm text-slate-600 hover:text-slate-900 underline"
+              >
+                Lupa password?
+              </Link>
+            </div>
           </div>
 
           <PrimaryButton onClick={handleLogin} type="button" className="mt-6">
