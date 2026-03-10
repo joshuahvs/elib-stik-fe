@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { fetchDigitalSignedUrl, openInNewTab } from "@/app/lib/booksDigital";
 
 type BorrowStatus = "Dikembalikan" | "Dipinjam" | "Terlambat";
 
@@ -11,6 +13,8 @@ type BorrowedBook = {
   tanggalPinjam: string; // ISO date
   jatuhTempo: string; // ISO date
   tanggalKembali?: string; // ISO date
+  /** ID yang dipakai backend untuk akses file di Supabase Storage (contoh: 'sample') */
+  digitalId?: string;
 };
 
 const DUMMY_BORROWED_BOOKS: BorrowedBook[] = Array.from({ length: 23 }).map(
@@ -35,6 +39,7 @@ const DUMMY_BORROWED_BOOKS: BorrowedBook[] = Array.from({ length: 23 }).map(
       tanggalKembali: returnDate
         ? returnDate.toISOString().slice(0, 10)
         : undefined,
+      digitalId: idx % 3 === 0 ? "sample" : undefined,
     };
   },
 );
@@ -81,6 +86,30 @@ function StatusPill({ status }: { status: BorrowStatus }) {
 
 export default function BorrowedBooksPage() {
   const books = DUMMY_BORROWED_BOOKS;
+
+  const [openingDigitalId, setOpeningDigitalId] = useState<string | null>(null);
+
+  async function handleOpenDigital(digitalId: string) {
+    const token = window.localStorage.getItem("token");
+    if (!token) {
+      window.location.href = "/auth/login";
+      return;
+    }
+
+    try {
+      setOpeningDigitalId(digitalId);
+      const { signedUrl } = await fetchDigitalSignedUrl({
+        token,
+        bookId: digitalId,
+      });
+      openInNewTab(signedUrl);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Gagal membuka buku digital";
+      alert(msg);
+    } finally {
+      setOpeningDigitalId(null);
+    }
+  }
 
   const pageSize = 6;
   const [page, setPage] = useState(1);
@@ -172,6 +201,7 @@ export default function BorrowedBooksPage() {
                     <th className="text-left font-semibold px-6 py-3">
                       Status
                     </th>
+                    <th className="text-left font-semibold px-6 py-3">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -196,6 +226,24 @@ export default function BorrowedBooksPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <StatusPill status={status} />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {item.digitalId ? (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDigital(item.digitalId!)}
+                              disabled={openingDigitalId === item.digitalId}
+                              className={
+                                "inline-flex h-9 items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                              }
+                            >
+                              {openingDigitalId === item.digitalId
+                                ? "Membuka…"
+                                : "Baca Digital"}
+                            </button>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
                         </td>
                       </tr>
                     );
