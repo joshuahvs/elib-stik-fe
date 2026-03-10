@@ -254,7 +254,6 @@ export default function AdminBorrowedBookRequestsPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Navbar />
 
       <main className="mx-auto max-w-6xl px-6 py-10">
         <div className="flex items-start justify-between gap-6">
