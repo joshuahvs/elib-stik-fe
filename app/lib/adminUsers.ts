@@ -9,6 +9,13 @@ export type AdminUserRow = {
   role: string | null;
   status: UserStatus | null;
   last_login_at: string | null;
+  jenjang?: string | null;
+  tanggal_batas_aktif?: string | null;
+  nama_lengkap?: string | null;
+  username?: string | null;
+  nim?: string | null;
+  nomor_dosen?: string | null;
+  created_at?: string | null;
 };
 
 export type AdminUsersResponse =
@@ -29,12 +36,14 @@ export async function fetchAdminUsers(opts: {
   token: string;
   status?: UserStatus | "";
   role?: UserRole | "";
+  email?: string;
   page?: number;
   limit?: number;
 }) {
-  const qs = buildQuery({
+    const qs = buildQuery({
     status: opts.status,
     role: opts.role,
+    email: opts.email,
     page: opts.page ?? 1,
     limit: opts.limit ?? 10,
   });

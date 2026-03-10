@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Navbar from "@/app/components/Navbar";
 import PrimaryButton from "@/app/components/PrimaryButton";
 import Link from "next/link";
@@ -26,9 +26,10 @@ function formatWIB(iso: string) {
     )
   ).padStart(2, "0");
 
-  const year = new Intl.DateTimeFormat("id-ID", { timeZone: "Asia/Jakarta", year: "numeric" }).format(
-    d
-  );
+  const year = new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+  }).format(d);
 
   const hour = new Intl.DateTimeFormat("id-ID", {
     timeZone: "Asia/Jakarta",
@@ -42,6 +43,16 @@ function formatWIB(iso: string) {
   }).format(d);
 
   return `${day}-${month}-${year} ${hour}:${minute}`;
+}
+
+function formatDateOnly(iso?: string | null) {
+  if (!iso) return "-";
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "Asia/Jakarta",
+  }).format(new Date(iso));
 }
 
 function roleLabel(role: string | null) {
@@ -71,16 +82,12 @@ export default function AdminUsersPage() {
   const [rows, setRows] = useState<AdminUserRow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  // filter
   const [status, setStatus] = useState<UserStatus | "">("");
   const [role, setRole] = useState<UserRole | "">("");
+  const [email, setEmail] = useState<string>("");
 
-  // pagination
-  const [page, setPage] = useState(1);
-  const limit = 10;
-  const [total, setTotal] = useState<number | undefined>(undefined);
+  const limit = 200;
 
-  // ambil token + cek role admin
   useEffect(() => {
     const t = localStorage.getItem("token");
     setToken(t);
@@ -102,7 +109,7 @@ export default function AdminUsersPage() {
       .finally(() => setMeLoading(false));
   }, []);
 
-  async function load(nextPage = 1) {
+  async function load() {
     if (!token) return;
 
     setIsLoading(true);
@@ -113,44 +120,25 @@ export default function AdminUsersPage() {
         token,
         status,
         role,
-        page: nextPage,
+        email,
         limit,
       });
 
       setRows(res.data);
-
-      // total optional (biar TS aman)
-      const t = "total" in res ? res.total : undefined;
-      setTotal(t);
-
-      setPage(nextPage);
     } catch (e: any) {
       setError(e?.message ?? "Gagal memuat data");
       setRows([]);
-      setTotal(undefined);
     } finally {
       setIsLoading(false);
     }
   }
 
-  // load awal setelah admin valid
   useEffect(() => {
     if (meLoading) return;
     if (!token) return;
     if (!isAdmin) return;
-    load(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    load();
   }, [meLoading, token, isAdmin]);
-
-  const totalPages = useMemo(() => {
-    if (typeof total === "number") return Math.max(1, Math.ceil(total / limit));
-    return Math.max(1, Math.ceil(rows.length / limit));
-  }, [total, rows.length]);
-
-  const pageNumbers = useMemo(() => {
-    const max = Math.min(totalPages, 10);
-    return Array.from({ length: max }, (_, i) => i + 1);
-  }, [totalPages]);
 
   const empty = !isLoading && rows.length === 0;
 
@@ -158,7 +146,7 @@ export default function AdminUsersPage() {
     <div className="min-h-screen bg-white">
       <Navbar />
 
-      <main className="mx-auto max-w-6xl px-6 py-10">
+      <main className="mx-auto max-w-[1400px] px-6 py-10">
         {!meLoading && !token ? (
           <div className="bg-white rounded-2xl shadow-xl p-8 md:p-10 max-w-xl mx-auto text-center">
             <h1 className="text-2xl font-bold text-slate-900">Daftar Pengguna</h1>
@@ -184,8 +172,7 @@ export default function AdminUsersPage() {
               <h1 className="text-2xl font-bold text-slate-900">Daftar Pengguna</h1>
             </div>
 
-            {/* FILTER BAR: Status + Peran */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
               <div className="md:col-span-2">
                 <label className="block text-sm font-semibold text-slate-800 mb-2">Status</label>
                 <select
@@ -215,8 +202,19 @@ export default function AdminUsersPage() {
                 </select>
               </div>
 
+              <div className="md:col-span-1">
+                <label className="block text-sm font-semibold text-slate-800 mb-2">E-mail</label>
+                <input
+                  type="text"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Cari email..."
+                  className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#8B5A3C]"
+                />
+              </div>
+
               <div className="md:col-span-1 md:justify-self-end">
-                <PrimaryButton type="button" onClick={() => load(1)} className="h-11 px-8">
+                <PrimaryButton type="button" onClick={load} className="h-11 px-8">
                   Filter
                 </PrimaryButton>
               </div>
@@ -228,15 +226,20 @@ export default function AdminUsersPage() {
               </div>
             ) : null}
 
-            {/* TABLE */}
             <div className="mt-10">
               <div className="rounded-2xl border overflow-hidden text-slate-900">
-                <div className="grid grid-cols-5 bg-[#6b3a22] text-white font-semibold text-sm">
-                  <div className="px-5 py-3">Terakhir Login</div>
-                  <div className="px-5 py-3">E-mail</div>
-                  <div className="px-5 py-3">Status</div>
-                  <div className="px-5 py-3">Peran</div>
-                  <div className="px-5 py-3">ID Pengguna</div>
+                <div
+                  className="grid bg-[#6b3a22] text-white font-semibold text-sm"
+                  style={{ gridTemplateColumns: "1.4fr 1.6fr 1fr 0.8fr 0.9fr 1fr 1.2fr 0.8fr" }}
+                >
+                  <div className="px-4 py-3">Nama</div>
+                  <div className="px-4 py-3">E-mail</div>
+                  <div className="px-4 py-3">Peran</div>
+                  <div className="px-4 py-3">Jenjang</div>
+                  <div className="px-4 py-3">Status</div>
+                  <div className="px-4 py-3">Batas Aktif</div>
+                  <div className="px-4 py-3">Terakhir Login</div>
+                  <div className="px-4 py-3">Aksi</div>
                 </div>
 
                 {isLoading ? <div className="p-8 text-center text-slate-600">Memuat data…</div> : null}
@@ -248,12 +251,25 @@ export default function AdminUsersPage() {
                 ) : null}
 
                 {!isLoading && rows.length > 0 ? (
-                  <div className="divide-y text-slate-900">
+                  <div className="max-h-[560px] overflow-y-auto divide-y text-slate-900">
                     {rows.map((u) => (
-                      <div key={u.id} className="grid grid-cols-5 text-sm">
-                        <div className="px-5 py-4">{u.last_login_at ? formatWIB(u.last_login_at) : "-"}</div>
-                        <div className="px-5 py-4">{u.email ?? "-"}</div>
-                        <div className="px-5 py-4">
+                      <div
+                        key={u.id}
+                        className="grid text-sm items-start"
+                        style={{ gridTemplateColumns: "1.4fr 1.6fr 1fr 0.8fr 0.9fr 1fr 1.2fr 0.8fr" }}
+                      >
+                        <div className="px-4 py-4 min-w-0">
+                          <div className="font-medium break-words">{u.nama_lengkap ?? "-"}</div>
+                          <div className="text-xs text-slate-500 break-words">{u.username ?? "-"}</div>
+                        </div>
+
+                        <div className="px-4 py-4 min-w-0 break-words">{u.email ?? "-"}</div>
+
+                        <div className="px-4 py-4 whitespace-nowrap">{roleLabel(u.role)}</div>
+
+                        <div className="px-4 py-4 whitespace-nowrap">{u.jenjang ?? "-"}</div>
+
+                        <div className="px-4 py-4">
                           <span
                             className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${statusBadge(
                               u.status ?? null
@@ -262,59 +278,32 @@ export default function AdminUsersPage() {
                             {u.status ?? "-"}
                           </span>
                         </div>
-                        <div className="px-5 py-4">{roleLabel(u.role)}</div>
-                        <div className="px-5 py-4">{u.id}</div>
+
+                        <div className="px-4 py-4 whitespace-nowrap">
+                          {formatDateOnly(u.tanggal_batas_aktif ?? null)}
+                        </div>
+
+                        <div className="px-4 py-4 whitespace-nowrap">
+                          {u.last_login_at ? formatWIB(u.last_login_at) : "-"}
+                        </div>
+
+                        <div className="px-4 py-4 flex items-start">
+                          <Link
+                            href={`/admin/users/${u.id}`}
+                            className="inline-flex items-center rounded-lg bg-[#6b3a22] px-4 py-2 text-white text-sm font-medium hover:opacity-90"
+                          >
+                            Edit
+                          </Link>
+                        </div>
                       </div>
                     ))}
                   </div>
                 ) : null}
               </div>
 
-              {/* PAGINATION */}
               {!isLoading && rows.length > 0 ? (
-                <div className="mt-8 flex flex-col items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => load(Math.max(1, page - 1))}
-                      disabled={page <= 1}
-                      className="w-11 h-11 rounded-full bg-[#6b3a22] text-white disabled:opacity-40"
-                      aria-label="prev"
-                    >
-                      ‹
-                    </button>
-
-                    <div className="flex items-center gap-2">
-                      {pageNumbers.map((p) => (
-                        <button
-                          key={p}
-                          type="button"
-                          onClick={() => load(p)}
-                          className={`w-9 h-9 rounded-full text-sm ${
-                            p === page ? "bg-[#b59a87] text-white" : "text-slate-700"
-                          }`}
-                        >
-                          {p}
-                        </button>
-                      ))}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => load(Math.min(totalPages, page + 1))}
-                      disabled={page >= totalPages}
-                      className="w-11 h-11 rounded-full bg-[#6b3a22] text-white disabled:opacity-40"
-                      aria-label="next"
-                    >
-                      ›
-                    </button>
-                  </div>
-
-                  {typeof total === "number" ? (
-                    <p className="text-sm text-slate-600">
-                      Menampilkan {Math.min(limit, total)} dari {total} data
-                    </p>
-                  ) : null}
+                <div className="mt-6 text-center text-sm text-slate-600">
+                  Menampilkan {rows.length} data
                 </div>
               ) : null}
             </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Navbar from "@/app/components/Navbar";
 import PrimaryButton from "@/app/components/PrimaryButton";
 import Link from "next/link";
@@ -17,7 +17,10 @@ function formatWIB(iso: string) {
     Number(new Intl.DateTimeFormat("id-ID", { timeZone: "Asia/Jakarta", month: "2-digit" }).format(d))
   ).padStart(2, "0");
 
-  const year = new Intl.DateTimeFormat("id-ID", { timeZone: "Asia/Jakarta", year: "numeric" }).format(d);
+  const year = new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+  }).format(d);
 
   const hour = new Intl.DateTimeFormat("id-ID", {
     timeZone: "Asia/Jakarta",
@@ -52,18 +55,14 @@ export default function AdminLoginLogsPage() {
   const [logs, setLogs] = useState<LoginLog[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  // filter (sesuai hifi)
-  const [from, setFrom] = useState<string>(""); // YYYY-MM-DD
+  const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
   const [status, setStatus] = useState<LoginLogStatus | "">("");
   const [role, setRole] = useState<string>("");
+  const [email, setEmail] = useState<string>("");
 
-  // pagination
-  const [page, setPage] = useState(1);
-  const limit = 10;
-  const [total, setTotal] = useState<number | undefined>(undefined);
+  const limit = 200;
 
-  // 1) ambil token + cek role admin dari /auth/me
   useEffect(() => {
     const t = localStorage.getItem("token");
     setToken(t);
@@ -85,7 +84,7 @@ export default function AdminLoginLogsPage() {
       .finally(() => setMeLoading(false));
   }, []);
 
-  async function load(nextPage = 1) {
+  async function load() {
     if (!token) return;
 
     setIsLoading(true);
@@ -98,41 +97,25 @@ export default function AdminLoginLogsPage() {
         to,
         status,
         role,
-        page: nextPage,
+        email,
         limit,
       });
 
       setLogs(res.data);
-      setTotal(res.data.length);
-      setPage(nextPage);
     } catch (e: any) {
       setError(e?.message ?? "Gagal memuat data");
       setLogs([]);
-      setTotal(undefined);
     } finally {
       setIsLoading(false);
     }
   }
 
-  // 2) load awal setelah admin valid
   useEffect(() => {
     if (meLoading) return;
     if (!token) return;
     if (!isAdmin) return;
-    load(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    load();
   }, [meLoading, token, isAdmin]);
-
-  const totalPages = useMemo(() => {
-    if (typeof total === "number") return Math.max(1, Math.ceil(total / limit));
-
-    return Math.max(1, Math.ceil(logs.length / limit));
-  }, [total, logs.length]);
-
-  const pageNumbers = useMemo(() => {
-    const max = Math.min(totalPages, 10);
-    return Array.from({ length: max }, (_, i) => i + 1);
-  }, [totalPages]);
 
   const empty = !isLoading && logs.length === 0;
 
@@ -141,7 +124,6 @@ export default function AdminLoginLogsPage() {
       <Navbar />
 
       <main className="mx-auto max-w-6xl px-6 py-10">
-        {/* Belum login */}
         {!meLoading && !token ? (
           <div className="bg-white rounded-2xl shadow-xl p-8 md:p-10 max-w-xl mx-auto text-center">
             <h1 className="text-2xl font-bold text-slate-900">Riwayat Login</h1>
@@ -154,17 +136,13 @@ export default function AdminLoginLogsPage() {
           </div>
         ) : null}
 
-        {/* Bukan admin */}
         {!meLoading && token && !isAdmin ? (
           <div className="bg-white rounded-2xl shadow-xl p-8 md:p-10 max-w-xl mx-auto text-center">
             <h1 className="text-2xl font-bold text-slate-900">Riwayat Login</h1>
-            <p className="mt-2 text-slate-600">
-              Halaman ini hanya bisa diakses oleh admin.
-            </p>
+            <p className="mt-2 text-slate-600">Halaman ini hanya bisa diakses oleh admin.</p>
           </div>
         ) : null}
 
-        {/* Admin page */}
         {!meLoading && token && isAdmin ? (
           <>
             <div className="flex items-center justify-between mb-8">
@@ -172,14 +150,14 @@ export default function AdminLoginLogsPage() {
             </div>
 
             {/* FILTER BAR */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
               <div>
                 <label className="block text-sm font-semibold text-slate-800 mb-2">Dari Tanggal</label>
                 <input
                   type="date"
                   value={from}
                   onChange={(e) => setFrom(e.target.value)}
-                  className="h-11 w-full rounded-xl border border-slate-300 px-3 bg-white px-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#8B5A3C]"
+                  className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#8B5A3C]"
                 />
               </div>
 
@@ -189,7 +167,7 @@ export default function AdminLoginLogsPage() {
                   type="date"
                   value={to}
                   onChange={(e) => setTo(e.target.value)}
-                  className="h-11 w-full rounded-xl border border-slate-300 px-3 bg-white px-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#8B5A3C]"
+                  className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#8B5A3C]"
                 />
               </div>
 
@@ -198,7 +176,7 @@ export default function AdminLoginLogsPage() {
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value as any)}
-                  className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#8B5A3C]"
+                  className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#8B5A3C]"
                 >
                   <option value="">Pilihan Opsi</option>
                   <option value="success">success</option>
@@ -211,7 +189,7 @@ export default function AdminLoginLogsPage() {
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
-                  className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#8B5A3C]"
+                  className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#8B5A3C]"
                 >
                   <option value="">Pilihan Opsi</option>
                   <option value="dosen">Dosen</option>
@@ -221,18 +199,24 @@ export default function AdminLoginLogsPage() {
                 </select>
               </div>
 
+              <div>
+                <label className="block text-sm font-semibold text-slate-800 mb-2">E-mail</label>
+                <input
+                  type="text"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Cari email..."
+                  className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#8B5A3C]"
+                />
+              </div>
+
               <div className="md:justify-self-end">
-                <PrimaryButton
-                  type="button"
-                  onClick={() => load(1)}
-                  className="h-11 px-8"
-                >
+                <PrimaryButton type="button" onClick={load} className="h-11 px-8">
                   Filter
                 </PrimaryButton>
               </div>
             </div>
 
-            {/* ERROR */}
             {error ? (
               <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
                 {error}
@@ -250,9 +234,7 @@ export default function AdminLoginLogsPage() {
                   <div className="px-5 py-3">ID Pengguna</div>
                 </div>
 
-                {isLoading ? (
-                  <div className="p-8 text-center text-slate-600">Memuat data…</div>
-                ) : null}
+                {isLoading ? <div className="p-8 text-center text-slate-600">Memuat data…</div> : null}
 
                 {empty ? (
                   <div className="p-8 text-center text-slate-600">
@@ -261,7 +243,7 @@ export default function AdminLoginLogsPage() {
                 ) : null}
 
                 {!isLoading && logs.length > 0 ? (
-                  <div className="divide-y text-slate-900">
+                  <div className="max-h-[520px] overflow-y-auto divide-y text-slate-900">
                     {logs.map((row) => (
                       <div key={row.id} className="grid grid-cols-5 text-sm">
                         <div className="px-5 py-4">{formatWIB(row.created_at)}</div>
@@ -285,51 +267,9 @@ export default function AdminLoginLogsPage() {
                 ) : null}
               </div>
 
-              {/* PAGINATION */}
               {!isLoading && logs.length > 0 ? (
-                <div className="mt-8 flex flex-col items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => load(Math.max(1, page - 1))}
-                      disabled={page <= 1}
-                      className="w-11 h-11 rounded-full bg-[#6b3a22] text-white disabled:opacity-40"
-                      aria-label="prev"
-                    >
-                      ‹
-                    </button>
-
-                    <div className="flex items-center gap-2">
-                      {pageNumbers.map((p) => (
-                        <button
-                          key={p}
-                          type="button"
-                          onClick={() => load(p)}
-                          className={`w-9 h-9 rounded-full text-sm ${
-                            p === page ? "bg-[#b59a87] text-white" : "text-slate-700"
-                          }`}
-                        >
-                          {p}
-                        </button>
-                      ))}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => load(Math.min(totalPages, page + 1))}
-                      disabled={page >= totalPages}
-                      className="w-11 h-11 rounded-full bg-[#6b3a22] text-white disabled:opacity-40"
-                      aria-label="next"
-                    >
-                      ›
-                    </button>
-                  </div>
-
-                  {typeof total === "number" ? (
-                    <p className="text-sm text-slate-600">
-                      Menampilkan {Math.min(limit, total)} dari {total} data
-                    </p>
-                  ) : null}
+                <div className="mt-6 text-center text-sm text-slate-600">
+                  Menampilkan {logs.length} data
                 </div>
               ) : null}
             </div>
