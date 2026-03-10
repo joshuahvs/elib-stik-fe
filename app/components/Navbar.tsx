@@ -18,6 +18,7 @@ type NavbarProps = {
 export default function Navbar({ items, menuItems }: NavbarProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const navItems: NavbarItem[] = items ?? [
@@ -27,7 +28,31 @@ export default function Navbar({ items, menuItems }: NavbarProps) {
     { label: "Akun", href: "/profile" },
   ];
 
-  const hasMenu = Boolean(menuItems && menuItems.length > 0);
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    fetch("http://localhost:8080/auth/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((me) => {
+        const currentRole = me?.role ?? me?.user?.role ?? me?.data?.role ?? null;
+        setRole(currentRole);
+      })
+      .catch(() => setRole(null));
+  }, []);
+
+  const computedMenuItems: NavbarItem[] =
+    menuItems ??
+    (role === "admin"
+      ? [
+          { label: "Riwayat Login", href: "/admin/login-logs" },
+          { label: "Daftar Pengguna", href: "/admin/users" },
+        ]
+      : []);
+
+  const hasMenu = computedMenuItems.length > 0;
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -79,38 +104,37 @@ export default function Navbar({ items, menuItems }: NavbarProps) {
             );
           })}
 
-          <div className="relative" ref={menuRef}>
-            <button
-              type="button"
-              className={[
-                "transition-colors hover:text-slate-900",
-                hasMenu ? "" : "text-slate-400 cursor-not-allowed",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              onClick={() => {
-                if (!hasMenu) return;
-                setOpen((v) => !v);
-              }}
-            >
-              Menu
-            </button>
+          {role === "admin" ? (
+            <div className="relative" ref={menuRef}>
+              <button
+                type="button"
+                className="transition-colors hover:text-slate-900"
+                onClick={() => {
+                  if (!hasMenu) return;
+                  setOpen((v) => !v);
+                }}
+              >
+                Menu
+              </button>
 
-            {hasMenu && open ? (
-              <div className="absolute right-0 mt-2 w-48 rounded-xl border bg-white shadow-lg overflow-hidden z-50">
-                {menuItems!.map((mi) => (
-                  <Link
-                    key={mi.label}
-                    href={mi.href}
-                    className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
-                    onClick={() => setOpen(false)}
-                  >
-                    {mi.label}
-                  </Link>
-                ))}
-              </div>
-            ) : null}
-          </div>
+              {hasMenu && open ? (
+                <div className="absolute right-0 mt-2 w-48 rounded-xl border bg-white shadow-lg overflow-hidden z-50">
+                  {computedMenuItems.map((mi) => (
+                    <Link
+                      key={mi.label}
+                      href={mi.href}
+                      className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                      onClick={() => setOpen(false)}
+                    >
+                      {mi.label}
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <span className="text-slate-400 cursor-not-allowed">Menu</span>
+          )}
 
           {(() => {
             const item = navItems[3];
