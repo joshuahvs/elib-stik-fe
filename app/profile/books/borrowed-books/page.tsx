@@ -5,7 +5,13 @@ import Link from "next/link";
 import { fetchDigitalSignedUrl, openInNewTab } from "@/app/lib/booksDigital";
 import { fetchRiwayatPeminjamanMe } from "@/app/lib/peminjamanBuku";
 
-type BorrowStatus = "Dikembalikan" | "Dipinjam" | "Terlambat";
+type BorrowStatus =
+  | "Diajukan"
+  | "Disetujui"
+  | "Ditolak"
+  | "Dikembalikan"
+  | "Dipinjam"
+  | "Terlambat";
 
 type BorrowedBook = {
   id: string;
@@ -15,6 +21,7 @@ type BorrowedBook = {
   jatuhTempo: string;
   tanggalKembali?: string;
   digitalId?: string;
+  status?: string;
 };
 
 function pickFirstString(obj: any, keys: string[]): string | undefined {
@@ -81,6 +88,7 @@ function mapLoanToBorrowedBook(row: any): BorrowedBook {
     jatuhTempo: jatuhTempo || "",
     tanggalKembali,
     digitalId: digitalId && digitalId !== "" ? digitalId : undefined,
+    status: typeof row?.status === "string" ? row.status : undefined,
   };
 }
 
@@ -95,6 +103,14 @@ function formatDate(isoDate: string) {
 }
 
 function getStatus(item: BorrowedBook, now: Date): BorrowStatus {
+  const backend = String(item.status ?? "").toUpperCase();
+  if (backend === "DIAJUKAN") return "Diajukan";
+  if (backend === "DISETUJUI") return "Disetujui";
+  if (backend === "DITOLAK") return "Ditolak";
+  if (backend === "DIKEMBALIKAN") return "Dikembalikan";
+  if (backend === "DIPINJAM") return "Dipinjam";
+
+  // Fallback: infer from dates (for older responses).
   if (item.tanggalKembali) return "Dikembalikan";
 
   const due = new Date(`${item.jatuhTempo}T23:59:59`);
@@ -106,9 +122,15 @@ function StatusPill({ status }: { status: BorrowStatus }) {
   const className =
     status === "Dikembalikan"
       ? "bg-slate-100 text-slate-700"
-      : status === "Terlambat"
-        ? "bg-slate-900 text-white"
-        : "bg-white border text-slate-700";
+      : status === "Diajukan"
+        ? "bg-slate-100 text-slate-700"
+        : status === "Ditolak"
+          ? "bg-rose-100 text-rose-700"
+          : status === "Disetujui"
+            ? "bg-slate-800 text-white"
+            : status === "Terlambat"
+              ? "bg-slate-900 text-white"
+              : "bg-white border text-slate-700";
 
   return (
     <span
@@ -234,8 +256,21 @@ export default function BorrowedBooksPage() {
     }
 
     run();
+
+    function onFocus() {
+      run();
+    }
+
+    function onVisibility() {
+      if (document.visibilityState === "visible") run();
+    }
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [page, pageSize, token]);
 
