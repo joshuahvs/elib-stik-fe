@@ -109,7 +109,6 @@ export default function AdminUserDetailPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Navbar />
 
       <main className="mx-auto max-w-5xl px-6 py-10">
         <div className="mb-8 flex items-center justify-between">

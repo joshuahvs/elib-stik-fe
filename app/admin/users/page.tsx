@@ -144,7 +144,6 @@ export default function AdminUsersPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Navbar />
 
       <main className="mx-auto max-w-[1400px] px-6 py-10">
         {!meLoading && !token ? (
