@@ -9,12 +9,7 @@ import { fetchDigitalSignedUrl, openInNewTab } from "@/app/lib/booksDigital";
 type BookDetail = {
   id: string;
   title?: string | null;
-  author?: string | null;
-  description?: string | null;
-  cover_url?: string | null;
   file_path?: string | null;
-  mime_type?: string | null;
-  created_at?: string | null;
 };
 
 export default function BookDetailsPage() {
@@ -155,26 +150,6 @@ export default function BookDetailsPage() {
             <div className="font-semibold text-slate-900">Gagal memuat</div>
             <div className="mt-2">{error}</div>
           </div>
-        ) : null}
-
-        {book && !loading && !error ? (
-          <section className="mt-8 rounded-2xl border p-6">
-            <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
-            {book.author ? (
-              <p className="mt-1 text-slate-600">{book.author}</p>
-            ) : null}
-            {book.description ? (
-              <p className="mt-4 text-slate-700 whitespace-pre-line">
-                {book.description}
-              </p>
-            ) : null}
-
-            <div className="mt-6 text-sm text-slate-600">
-              <div>ID: {book.id}</div>
-              {book.mime_type ? <div>MIME: {book.mime_type}</div> : null}
-              {book.file_path ? <div>Path: {book.file_path}</div> : null}
-            </div>
-          </section>
         ) : null}
       </main>
     </div>

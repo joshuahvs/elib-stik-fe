@@ -68,8 +68,8 @@ export async function fetchDigitalSignedUrl(opts: {
 
 export function openInNewTab(url: string) {
   const w = window.open(url, "_blank", "noopener,noreferrer");
-  if (!w) {
-    // Popup blocked → fallback
-    window.location.href = url;
-  }
+  // if (!w) {
+  //   // Popup blocked → fallback
+  //   window.location.href = url;
+  // }
 }
