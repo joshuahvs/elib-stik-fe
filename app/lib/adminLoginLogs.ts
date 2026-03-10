@@ -11,14 +11,13 @@ export type LoginLog = {
   status: LoginLogStatus;
   ip_address: string | null;
   user_agent: string | null;
-  created_at: string; // ISO string dari Supabase
+  created_at: string;
 };
 
 export type LoginLogsResponse =
   | { data: LoginLog[]; total?: number; page?: number; limit?: number }
   | LoginLog[];
 
-/** Build query string dari filter */
 function buildQuery(params: Record<string, string | number | undefined | null>) {
   const sp = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
@@ -31,10 +30,11 @@ function buildQuery(params: Record<string, string | number | undefined | null>) 
 
 export async function fetchLoginLogs(opts: {
   token: string;
-  from?: string;  // YYYY-MM-DD
-  to?: string;    // YYYY-MM-DD
+  from?: string;
+  to?: string;
   status?: LoginLogStatus | "";
   role?: LoginLogRole | "";
+  email?: string;
   page?: number;
   limit?: number;
 }) {
@@ -43,6 +43,7 @@ export async function fetchLoginLogs(opts: {
     to: opts.to,
     status: opts.status,
     role: opts.role,
+    email: opts.email,
     page: opts.page ?? 1,
     limit: opts.limit ?? 10,
   });
@@ -62,9 +63,9 @@ export async function fetchLoginLogs(opts: {
     throw new Error(msg);
   }
 
-  // Support 2 bentuk response: array langsung atau {data,total}
   if (Array.isArray(data)) {
     return { data };
   }
+
   return data as { data: LoginLog[]; total?: number; page?: number; limit?: number };
 }
