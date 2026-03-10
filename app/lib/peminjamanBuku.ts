@@ -9,6 +9,13 @@ export type ListRiwayatMeResult<T = any> = {
   total: number;
 };
 
+export type ListAdminPeminjamanResult<T = any> = {
+  items: T[];
+  page: number;
+  limit: number;
+  total: number;
+};
+
 function pickArray(data: any): any[] {
   if (Array.isArray(data)) return data;
   const candidates = [data?.items, data?.data, data?.rows, data?.results];
@@ -80,6 +87,118 @@ export async function fetchRiwayatPeminjamanMe(opts: {
     limit: Math.max(1, Math.trunc(outLimit || limit)),
     total: Math.max(0, Math.trunc(total || 0)),
   };
+}
+
+async function parseJsonOrText(res: Response) {
+  const contentType = res.headers.get("content-type") ?? "";
+  const isJson = contentType.includes("application/json");
+  const data = isJson ? await res.json().catch(() => null) : null;
+  const textBody = !isJson ? await res.text().catch(() => "") : "";
+  return { data, textBody };
+}
+
+function pickErrorMessage(data: any, textBody: string, fallback: string) {
+  const msgFromJson = data?.message ?? data?.error ?? data?.detail;
+  const msgFromText = textBody?.trim();
+  if (typeof msgFromJson === "string" && msgFromJson.trim()) return msgFromJson.trim();
+  if (msgFromText) return msgFromText;
+  return fallback;
+}
+
+export async function fetchAdminPeminjamanBuku(opts: {
+  token: string;
+  page?: number;
+  limit?: number;
+}): Promise<ListAdminPeminjamanResult> {
+  const page = Math.max(1, Math.trunc(opts.page ?? 1));
+  const limit = Math.min(100, Math.max(1, Math.trunc(opts.limit ?? 10)));
+
+  const candidates = [
+    `${API_URL}/peminjaman-buku/admin`,
+    `${API_URL}/admin/peminjaman-buku`,
+    `${API_URL}/peminjaman-buku`,
+  ];
+
+  let lastError: Error | null = null;
+
+  for (const base of candidates) {
+    const url = new URL(base);
+    url.searchParams.set("page", String(page));
+    url.searchParams.set("limit", String(limit));
+
+    try {
+      const res = await fetch(url.toString(), {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${opts.token}`,
+          Accept: "application/json",
+        },
+        cache: "no-store",
+      });
+
+      const { data, textBody } = await parseJsonOrText(res);
+      if (!res.ok) {
+        const msg = pickErrorMessage(data, textBody, "Gagal mengambil data peminjaman");
+        lastError = new Error(`${res.status} ${res.statusText}: ${msg}`);
+        continue;
+      }
+
+      const items = pickArray(data);
+      const meta = (data as any)?.meta ?? (data as any)?.pagination ?? {};
+      const total = pickNumber(
+        data,
+        ["total", "totalItems", "count"],
+        pickNumber(meta, ["total", "totalItems", "count"], items.length)
+      );
+      const outPage = pickNumber(data, ["page"], pickNumber(meta, ["page"], page));
+      const outLimit = pickNumber(
+        data,
+        ["limit", "take", "pageSize"],
+        pickNumber(meta, ["limit", "take", "pageSize"], limit)
+      );
+
+      return {
+        items,
+        page: Math.max(1, Math.trunc(outPage || page)),
+        limit: Math.max(1, Math.trunc(outLimit || limit)),
+        total: Math.max(0, Math.trunc(total || 0)),
+      };
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error("Gagal mengambil data peminjaman");
+    }
+  }
+
+  throw lastError ?? new Error("Gagal mengambil data peminjaman");
+}
+
+export async function updatePeminjamanBukuByAdmin(opts: {
+  token: string;
+  id: string;
+  status: string;
+  tanggal_peminjaman?: string;
+  akhir_peminjaman?: string;
+}): Promise<any> {
+  const res = await fetch(`${API_URL}/peminjaman-buku/${encodeURIComponent(opts.id)}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${opts.token}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      status: opts.status,
+      tanggal_peminjaman: opts.tanggal_peminjaman,
+      akhir_peminjaman: opts.akhir_peminjaman,
+    }),
+  });
+
+  const { data, textBody } = await parseJsonOrText(res);
+  if (!res.ok) {
+    const msg = pickErrorMessage(data, textBody, "Gagal memperbarui peminjaman");
+    throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+  }
+
+  return data;
 }
 
 export async function ajukanPeminjamanBuku(opts: {
