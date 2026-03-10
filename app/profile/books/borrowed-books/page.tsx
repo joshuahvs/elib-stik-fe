@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { fetchDigitalSignedUrl, openInNewTab } from "@/app/lib/booksDigital";
+import { fetchRiwayatPeminjamanMe } from "@/app/lib/peminjamanBuku";
 
 type BorrowStatus = "Dikembalikan" | "Dipinjam" | "Terlambat";
 
@@ -10,39 +11,78 @@ type BorrowedBook = {
   id: string;
   judul: string;
   penulis: string;
-  tanggalPinjam: string; // ISO date
-  jatuhTempo: string; // ISO date
-  tanggalKembali?: string; // ISO date
-  /** ID yang dipakai backend untuk akses file di Supabase Storage (contoh: 'sample') */
+  tanggalPinjam: string;
+  jatuhTempo: string;
+  tanggalKembali?: string;
   digitalId?: string;
 };
 
-const DUMMY_BORROWED_BOOKS: BorrowedBook[] = Array.from({ length: 23 }).map(
-  (_, i) => {
-    const idx = i + 1;
-    const baseBorrow = new Date("2026-02-01T00:00:00.000Z");
-    baseBorrow.setUTCDate(baseBorrow.getUTCDate() + i);
+function pickFirstString(obj: any, keys: string[]): string | undefined {
+  for (const k of keys) {
+    const v = obj?.[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return undefined;
+}
 
-    const due = new Date(baseBorrow);
-    due.setUTCDate(due.getUTCDate() + 7);
+function toIsoDate(value: any): string {
+  if (typeof value === "string") {
+    // Common shapes: 'YYYY-MM-DD' or ISO timestamp.
+    const s = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const d = new Date(s);
+    if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+  return "";
+}
 
-    const returned = idx % 7 === 0;
-    const returnDate = returned ? new Date(baseBorrow) : null;
-    if (returnDate) returnDate.setUTCDate(returnDate.getUTCDate() + 5);
+function mapLoanToBorrowedBook(row: any): BorrowedBook {
+  const buku = row?.buku ?? row?.book ?? row?.buku_detail ?? null;
 
-    return {
-      id: `BRW-${String(idx).padStart(4, "0")}`,
-      judul: `Judul Buku ${idx}`,
-      penulis: `Penulis ${((idx - 1) % 5) + 1}`,
-      tanggalPinjam: baseBorrow.toISOString().slice(0, 10),
-      jatuhTempo: due.toISOString().slice(0, 10),
-      tanggalKembali: returnDate
-        ? returnDate.toISOString().slice(0, 10)
-        : undefined,
-      digitalId: idx % 3 === 0 ? "sample" : undefined,
-    };
-  },
-);
+  const loanId =
+    pickFirstString(row, ["id", "loanId", "peminjamanId", "kode"]) ??
+    String(row?.id ?? "-");
+
+  const judul =
+    pickFirstString(buku, ["judul", "title", "nama"]) ??
+    pickFirstString(row, ["judul", "title"]) ??
+    "(Tanpa judul)";
+
+  const penulis =
+    pickFirstString(buku, ["penulis", "author", "pengarang"]) ??
+    pickFirstString(row, ["penulis", "author"]) ??
+    "-";
+
+  const tanggalPinjam = toIsoDate(
+    row?.tanggal_peminjaman ?? row?.tanggalPinjam ?? row?.start_date,
+  );
+
+  const jatuhTempo = toIsoDate(
+    row?.akhir_peminjaman ?? row?.jatuhTempo ?? row?.end_date,
+  );
+
+  const tanggalKembali =
+    toIsoDate(
+      row?.tanggal_pengembalian ?? row?.tanggalKembali ?? row?.returned_at,
+    ) || undefined;
+
+  const bukuId = row?.bukuId ?? buku?.id ?? buku?.bukuId;
+  const filePath = buku?.file_path ?? buku?.filePath ?? row?.file_path;
+  const digitalId = filePath ? String(bukuId ?? "") : undefined;
+
+  return {
+    id: String(loanId),
+    judul,
+    penulis,
+    tanggalPinjam: tanggalPinjam || "",
+    jatuhTempo: jatuhTempo || "",
+    tanggalKembali,
+    digitalId: digitalId && digitalId !== "" ? digitalId : undefined,
+  };
+}
 
 function formatDate(isoDate: string) {
   const d = new Date(`${isoDate}T00:00:00`);
@@ -85,7 +125,11 @@ function StatusPill({ status }: { status: BorrowStatus }) {
 }
 
 export default function BorrowedBooksPage() {
-  const books = DUMMY_BORROWED_BOOKS;
+  const [token, setToken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [books, setBooks] = useState<BorrowedBook[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
 
   const [openingDigitalId, setOpeningDigitalId] = useState<string | null>(null);
 
@@ -114,7 +158,6 @@ export default function BorrowedBooksPage() {
   const pageSize = 6;
   const [page, setPage] = useState(1);
 
-  const totalItems = books.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
 
   useEffect(() => {
@@ -122,12 +165,13 @@ export default function BorrowedBooksPage() {
   }, [totalPages]);
 
   const { pageItems, startIndex, endIndex } = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    const end = Math.min(start + pageSize, totalItems);
+    // When using backend pagination, current page's items are already sliced.
+    const start = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
+    const end = Math.min(page * pageSize, totalItems);
     return {
-      pageItems: books.slice(start, end),
-      startIndex: totalItems === 0 ? 0 : start + 1,
-      endIndex: end,
+      pageItems: books,
+      startIndex: start,
+      endIndex: totalItems === 0 ? 0 : end,
     };
   }, [books, page, pageSize, totalItems]);
 
@@ -142,6 +186,58 @@ export default function BorrowedBooksPage() {
   }, [page, totalPages]);
 
   const now = useMemo(() => new Date(), []);
+
+  useEffect(() => {
+    setToken(window.localStorage.getItem("token"));
+  }, []);
+
+  useEffect(() => {
+    if (!token) {
+      setLoading(false);
+      setError(null);
+      setBooks([]);
+      setTotalItems(0);
+      return;
+    }
+
+    const authToken = token;
+
+    let cancelled = false;
+
+    async function run() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const res = await fetchRiwayatPeminjamanMe({
+          token: authToken,
+          page,
+          limit: pageSize,
+        });
+
+        const mapped = (res.items ?? []).map(mapLoanToBorrowedBook);
+        if (!cancelled) {
+          setBooks(mapped);
+          setTotalItems(res.total ?? mapped.length);
+        }
+      } catch (e) {
+        const msg =
+          e instanceof Error ? e.message : "Gagal mengambil riwayat peminjaman";
+        if (!cancelled) {
+          setError(msg);
+          setBooks([]);
+          setTotalItems(0);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [page, pageSize, token]);
 
   return (
     <div className="min-h-screen bg-white">
@@ -160,7 +256,9 @@ export default function BorrowedBooksPage() {
         <section className="mt-8 rounded-2xl border bg-white">
           <div className="px-6 py-5 border-b">
             <div className="text-sm text-slate-600">
-              {totalItems === 0 ? (
+              {loading ? (
+                "Memuat data pinjaman…"
+              ) : totalItems === 0 ? (
                 "Belum ada data pinjaman."
               ) : (
                 <>
@@ -181,7 +279,23 @@ export default function BorrowedBooksPage() {
             </div>
           </div>
 
-          {totalItems === 0 ? (
+          {!token && !loading ? (
+            <div className="px-6 py-12 text-center text-slate-600">
+              Kamu belum login. Silakan masuk dulu.
+              <div className="mt-4">
+                <Link href="/auth/login" className="underline text-slate-900">
+                  Ke halaman login
+                </Link>
+              </div>
+            </div>
+          ) : loading ? (
+            <div className="px-6 py-12 text-center text-slate-600">Memuat…</div>
+          ) : error ? (
+            <div className="px-6 py-12 text-center text-slate-600">
+              <div className="font-semibold text-slate-900">Gagal memuat</div>
+              <div className="mt-2">{error}</div>
+            </div>
+          ) : totalItems === 0 ? (
             <div className="px-6 py-12 text-center text-slate-600">
               Belum ada buku yang kamu pinjam.
             </div>
@@ -219,10 +333,12 @@ export default function BorrowedBooksPage() {
                           <div className="text-slate-600">{item.penulis}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-slate-700">
-                          {formatDate(item.tanggalPinjam)}
+                          {item.tanggalPinjam
+                            ? formatDate(item.tanggalPinjam)
+                            : "—"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-slate-700">
-                          {formatDate(item.jatuhTempo)}
+                          {item.jatuhTempo ? formatDate(item.jatuhTempo) : "—"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <StatusPill status={status} />
@@ -253,7 +369,7 @@ export default function BorrowedBooksPage() {
             </div>
           )}
 
-          {totalItems > 0 ? (
+          {totalItems > 0 && !loading && !error && token ? (
             <div className="px-6 py-5 border-t flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="text-sm text-slate-600">
                 Halaman{" "}
