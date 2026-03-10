@@ -17,8 +17,6 @@ export default async function Home() {
       {/* HERO */}
       <div className="bg-[#4b200f] text-white pb-40">
 
-        <Navbar />
-
         <section className="max-w-7xl mx-auto pt-24 px-8">
           <div className="grid grid-cols-2 gap-16 items-start">
 

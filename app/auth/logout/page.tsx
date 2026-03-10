@@ -64,11 +64,6 @@ export default function LogoutConfirmPage() {
         style={{ backgroundImage: "url('/bg-2.png')" }}
         />
         
-        {/* Navbar */}
-        <div className="relative z-20">
-            <Navbar />
-        </div>
-        
         {/* Content */}
         <div className="relative z-10 min-h-screen flex items-center justify-center px-6">
         <div className="w-full max-w-xl rounded-3xl bg-white/85 backdrop-blur-md shadow-2xl p-10 text-center">
