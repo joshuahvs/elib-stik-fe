@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Suspense,
   type ChangeEvent,
   type FormEvent,
   useEffect,
@@ -24,6 +25,29 @@ function parseHashParams(hash: string): Record<string, string> {
 type Status = "idle" | "submitting" | "success" | "error";
 
 export default function ResetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-white">
+          <main className="mx-auto max-w-xl px-6 py-10">
+            <div className="rounded-2xl bg-white p-8 shadow-xl md:p-10">
+              <h1 className="mb-2 text-center text-2xl font-bold text-slate-900 md:text-3xl">
+                Reset Password
+              </h1>
+              <p className="mb-6 text-center text-sm text-slate-600">
+                Memproses…
+              </p>
+            </div>
+          </main>
+        </div>
+      }
+    >
+      <ResetPasswordInner />
+    </Suspense>
+  );
+}
+
+function ResetPasswordInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -247,7 +271,6 @@ export default function ResetPasswordPage() {
               </p>
             </form>
           )}
-
         </div>
       </main>
     </div>
