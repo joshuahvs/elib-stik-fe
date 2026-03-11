@@ -6,6 +6,8 @@ export interface BukuRow {
   url_sumber: string | null;
   judul: string | null;
   url_sampul: string | null;
+  file_path?: string | null;
+  filePath?: string | null;
   no_panggil: string | null;
   nama_orang: string | null;
   subjek: string | null;
