@@ -260,11 +260,11 @@ export default function KoleksiPage() {
                     <div className="flex flex-1 flex-col gap-1.5 p-3">
                       {book.jenis_koleksi && (
                         <span className="inline-block self-start rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-500">
-                          {book.jenis_koleksi}
+                          {cleanText(book.jenis_koleksi)}
                         </span>
                       )}
                       <h3 className="line-clamp-2 text-xs font-bold leading-snug text-slate-800">
-                        {book.judul ?? "Tanpa Judul"}
+                        {cleanText(book.judul) || "Tanpa Judul"}
                       </h3>
                       <p className="line-clamp-1 text-[11px] text-slate-500">{author}</p>
                       {subject && (
