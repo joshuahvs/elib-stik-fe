@@ -12,6 +12,11 @@ type BorrowStatus =
   | "Dikembalikan"
   | "Dipinjam"
   | "Terlambat";
+  
+type PerpanjanganStatus =
+  | "Perpanjangan Disetujui"
+  | "Perpanjangan Diajukan"
+  | "Perpanjangan Ditolak";
 
 type BorrowedBook = {
   id: string;
@@ -280,7 +285,7 @@ export default function BorrowedBooksPage() {
         <div className="flex items-start justify-between gap-6">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">
-              Buku yang Dipinjam
+              Riwayat Peminjaman
             </h1>
             <p className="mt-2 text-slate-600">
               Daftar buku yang sedang atau pernah kamu pinjam.

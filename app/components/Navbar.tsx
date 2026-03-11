@@ -365,7 +365,7 @@ export default function Navbar({ items, menuItems }: NavbarProps) {
                       className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
                       onClick={() => setUserOpen(false)}
                     >
-                      Buku Dipinjam
+                      Riwayat Peminjaman
                     </Link>
                      <Link
                       href="/auth/logout"
