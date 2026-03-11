@@ -111,6 +111,7 @@ export default function Navbar({ items, menuItems }: NavbarProps) {
         cancelUserClose();
       }
     }
+
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
@@ -155,7 +156,6 @@ export default function Navbar({ items, menuItems }: NavbarProps) {
           setMe(data);
         }
       } catch {
-        // Network error: keep optimistic state based on token presence.
         if (!cancelled) {
           setIsAuthed(Boolean(token));
         }
@@ -272,41 +272,6 @@ export default function Navbar({ items, menuItems }: NavbarProps) {
               ) : null}
             </div>
           ) : null}
-
-          {/* <div className="relative" ref={menuRef}>
-            <button
-              type="button"
-              className={[
-                "transition-colors hover:text-slate-900",
-                hasMenu ? "" : "text-slate-400 cursor-not-allowed",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              onClick={() => {
-                if (!hasMenu) return;
-                setOpen((v) => !v);
-                setAdminOpen(false);
-                setUserOpen(false);
-              }}
-            >
-              Menu
-            </button>
-
-            {hasMenu && open ? (
-              <div className="absolute right-0 mt-2 w-48 rounded-xl border bg-white shadow-lg overflow-hidden z-50">
-                {menuItems!.map((mi) => (
-                  <Link
-                    key={mi.label}
-                    href={mi.href}
-                    className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
-                    onClick={() => setOpen(false)}
-                  >
-                    {mi.label}
-                  </Link>
-                ))}
-              </div>
-            ) : null}
-          </div> */}
 
           {!isAuthed ? (
             <Link
