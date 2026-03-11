@@ -14,6 +14,8 @@ export default function ProfilePage() {
   const [user, setUser] = useState<any>(null);
   const router = useRouter();
 
+  const isReadOnly = true;
+
   const [form, setForm] = useState({
     namaLengkap: "Nama Lengkap",
     username: "",
@@ -42,9 +44,7 @@ export default function ProfilePage() {
         setUser(data);
         setForm((prev) => ({
           ...prev,
-          namaLengkap:
-            data?.nama_lengkap ??
-            prev.namaLengkap,
+          namaLengkap: data?.nama_lengkap ?? prev.namaLengkap,
           username: data?.username ?? prev.username,
           email: data?.email ?? prev.email,
           nomorTelepon: data?.phone,
@@ -146,6 +146,7 @@ export default function ProfilePage() {
                       placeholder="NIM"
                       value={form.nim}
                       onChange={handleChange}
+                      readOnly={isReadOnly}
                     />
                   ) : null}
 
@@ -156,6 +157,7 @@ export default function ProfilePage() {
                       placeholder="Nomor Dosen"
                       value={form.nomorDosen}
                       onChange={handleChange}
+                      readOnly={isReadOnly}
                     />
                   ) : null}
 
@@ -165,6 +167,7 @@ export default function ProfilePage() {
                     placeholder="Nama Lengkap"
                     value={form.namaLengkap}
                     onChange={handleChange}
+                    readOnly={isReadOnly}
                   />
 
                   <InputField
@@ -173,6 +176,7 @@ export default function ProfilePage() {
                     placeholder="Username"
                     value={form.username}
                     onChange={handleChange}
+                    readOnly={isReadOnly}
                   />
 
                   <InputField
@@ -182,6 +186,7 @@ export default function ProfilePage() {
                     placeholder="E-mail"
                     value={form.email}
                     onChange={handleChange}
+                    readOnly={isReadOnly}
                   />
 
                   <InputField
@@ -190,6 +195,7 @@ export default function ProfilePage() {
                     placeholder="00/00/0000"
                     value={form.tanggalLahir}
                     onChange={handleChange}
+                    readOnly={isReadOnly}
                   />
 
                   <InputField
@@ -198,6 +204,7 @@ export default function ProfilePage() {
                     placeholder="0000000000"
                     value={form.nomorTelepon}
                     onChange={handleChange}
+                    readOnly={isReadOnly}
                   />
                 </div>
               </div>
