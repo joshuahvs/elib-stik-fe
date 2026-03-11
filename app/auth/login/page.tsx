@@ -46,7 +46,7 @@ export default function LoginPage() {
     if (res.ok && accessToken) {
       localStorage.setItem("token", accessToken);
       alert("Login success!");
-      router.push("/profile");
+      router.push("/");
       return;
     }
 
