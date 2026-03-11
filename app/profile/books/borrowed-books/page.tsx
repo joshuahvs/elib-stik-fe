@@ -12,11 +12,6 @@ type BorrowStatus =
   | "Dikembalikan"
   | "Dipinjam"
   | "Terlambat";
-  
-type PerpanjanganStatus =
-  | "Perpanjangan Disetujui"
-  | "Perpanjangan Diajukan"
-  | "Perpanjangan Ditolak";
 
 type BorrowedBook = {
   id: string;
@@ -27,6 +22,8 @@ type BorrowedBook = {
   tanggalKembali?: string;
   digitalId?: string;
   status?: string;
+  statusPerpanjangan?: string;
+  akhirPerpanjangan?: string;
 };
 
 function pickFirstString(obj: any, keys: string[]): string | undefined {
@@ -85,6 +82,16 @@ function mapLoanToBorrowedBook(row: any): BorrowedBook {
   const filePath = buku?.file_path ?? buku?.filePath ?? row?.file_path;
   const digitalId = filePath ? String(bukuId ?? "") : undefined;
 
+  const statusPerpanjangan =
+    typeof row?.status_perpanjangan === "string"
+      ? row.status_perpanjangan
+      : typeof row?.statusPerpanjangan === "string"
+        ? row.statusPerpanjangan
+        : undefined;
+
+  const akhirPerpanjangan =
+    toIsoDate(row?.akhir_perpanjangan ?? row?.akhirPerpanjangan) || undefined;
+
   return {
     id: String(loanId),
     judul,
@@ -94,6 +101,8 @@ function mapLoanToBorrowedBook(row: any): BorrowedBook {
     tanggalKembali,
     digitalId: digitalId && digitalId !== "" ? digitalId : undefined,
     status: typeof row?.status === "string" ? row.status : undefined,
+    statusPerpanjangan,
+    akhirPerpanjangan,
   };
 }
 
@@ -121,6 +130,17 @@ function getStatus(item: BorrowedBook, now: Date): BorrowStatus {
   const due = new Date(`${item.jatuhTempo}T23:59:59`);
   if (!Number.isNaN(due.getTime()) && now > due) return "Terlambat";
   return "Dipinjam";
+}
+
+function formatPerpanjanganStatus(statusRaw: any): string | null {
+  if (statusRaw == null) return null;
+  const raw = String(statusRaw).trim();
+  if (!raw) return null;
+  const s = raw.toUpperCase();
+  if (s === "DIAJUKAN") return "Diajukan";
+  if (s === "DISETUJUI") return "Disetujui";
+  if (s === "DITOLAK") return "Ditolak";
+  return raw;
 }
 
 function StatusPill({ status }: { status: BorrowStatus }) {
@@ -361,6 +381,9 @@ export default function BorrowedBooksPage() {
                 <tbody className="divide-y">
                   {pageItems.map((item) => {
                     const status = getStatus(item, now);
+                    const perpanjanganLabel = formatPerpanjanganStatus(
+                      item.statusPerpanjangan,
+                    );
                     return (
                       <tr key={item.id} className="hover:bg-slate-50">
                         <td className="px-6 py-4 whitespace-nowrap text-slate-700">
@@ -381,7 +404,26 @@ export default function BorrowedBooksPage() {
                           {item.jatuhTempo ? formatDate(item.jatuhTempo) : "—"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <StatusPill status={status} />
+                          <div className="flex flex-col items-start gap-2">
+                            <StatusPill status={status} />
+                            {perpanjanganLabel ? (
+                              <div className="text-xs text-slate-600">
+                                <span className="font-medium text-slate-900">
+                                  Perpanjangan:
+                                </span>{" "}
+                                {perpanjanganLabel}
+                                {item.akhirPerpanjangan ? (
+                                  <>
+                                    <span className="text-slate-400"> · </span>
+                                    <span>
+                                      hingga{" "}
+                                      {formatDate(item.akhirPerpanjangan)}
+                                    </span>
+                                  </>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {item.digitalId ? (
