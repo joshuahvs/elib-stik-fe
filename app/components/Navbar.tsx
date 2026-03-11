@@ -30,18 +30,31 @@ function getDisplayName(me: any): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-export default function Navbar({ items, menuItems }: NavbarProps) {
+export default function Navbar({ items }: NavbarProps) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+
   const [adminOpen, setAdminOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
 
   const adminCloseTimer = useRef<number | null>(null);
   const userCloseTimer = useRef<number | null>(null);
 
-  const menuRef = useRef<HTMLDivElement>(null);
   const adminRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
+
+  const [isAuthed, setIsAuthed] = useState<boolean>(false);
+
+  const [me, setMe] = useState<any>(null);
+
+  const navItems: NavbarItem[] = items ?? [
+    { label: "Beranda", href: "/" },
+    { label: "Koleksi", href: "/koleksi" },
+    { label: "Isi Buku Tamu", href: "#", disabled: true },
+  ];
+
+  const role = getRole(me);
+  const isAdmin = role === "admin";
+  const displayName = getDisplayName(me) ?? "Akun";
 
   function cancelAdminClose() {
     if (adminCloseTimer.current != null) {
@@ -73,38 +86,15 @@ export default function Navbar({ items, menuItems }: NavbarProps) {
     }, 180);
   }
 
-  const [isAuthed, setIsAuthed] = useState<boolean>(() => {
-    // Optimistic initial value to avoid a flash after hydration.
-    // Still verified against backend below.
-    if (typeof window === "undefined") return false;
-    return Boolean(window.localStorage.getItem("token"));
-  });
-
-  const [me, setMe] = useState<any>(null);
-
-  const navItems: NavbarItem[] = items ?? [
-    { label: "Beranda", href: "/" },
-    { label: "Koleksi", href: "#", disabled: true },
-    { label: "Isi Buku Tamu", href: "#", disabled: true },
-  ];
-
-  const hasMenu = Boolean(menuItems && menuItems.length > 0);
-  const role = getRole(me);
-  const isAdmin = role === "admin";
-  const displayName = getDisplayName(me) ?? "Akun";
-
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
       const target = e.target as Node;
-      const clickedOutsideMenu =
-        !menuRef.current || !menuRef.current.contains(target);
       const clickedOutsideAdmin =
         !adminRef.current || !adminRef.current.contains(target);
       const clickedOutsideUser =
         !userRef.current || !userRef.current.contains(target);
 
-      if (clickedOutsideMenu && clickedOutsideAdmin && clickedOutsideUser) {
-        setOpen(false);
+      if (clickedOutsideAdmin && clickedOutsideUser) {
         setAdminOpen(false);
         setUserOpen(false);
         cancelAdminClose();
@@ -124,15 +114,18 @@ export default function Navbar({ items, menuItems }: NavbarProps) {
   }, []);
 
   useEffect(() => {
-    if (items) return; // if caller provides nav items, don't override/auth-check
+    if (items) return;
 
     let cancelled = false;
 
     async function verify() {
       const token = window.localStorage.getItem("token");
+
       if (!token) {
-        if (!cancelled) setIsAuthed(false);
-        if (!cancelled) setMe(null);
+        if (!cancelled) {
+          setIsAuthed(false);
+          setMe(null);
+        }
         return;
       }
 
@@ -145,12 +138,15 @@ export default function Navbar({ items, menuItems }: NavbarProps) {
 
         if (!res.ok) {
           window.localStorage.removeItem("token");
-          if (!cancelled) setIsAuthed(false);
-          if (!cancelled) setMe(null);
+          if (!cancelled) {
+            setIsAuthed(false);
+            setMe(null);
+          }
           return;
         }
 
         const data = await res.json().catch(() => null);
+
         if (!cancelled) {
           setIsAuthed(true);
           setMe(data);
@@ -173,7 +169,7 @@ export default function Navbar({ items, menuItems }: NavbarProps) {
       cancelled = true;
       window.removeEventListener("storage", onStorage);
     };
-  }, [API_URL, items, pathname]);
+  }, [items, pathname]);
 
   return (
     <header className="w-full bg-white border-b">
@@ -199,9 +195,7 @@ export default function Navbar({ items, menuItems }: NavbarProps) {
                   key={item.label}
                   type="button"
                   className={className}
-                  onClick={(e) => {
-                    e.preventDefault();
-                  }}
+                  onClick={(e) => e.preventDefault()}
                 >
                   {item.label}
                 </button>
@@ -223,7 +217,6 @@ export default function Navbar({ items, menuItems }: NavbarProps) {
                 cancelAdminClose();
                 setAdminOpen(true);
                 setUserOpen(false);
-                setOpen(false);
               }}
               onMouseLeave={() => {
                 scheduleAdminClose();
@@ -236,7 +229,6 @@ export default function Navbar({ items, menuItems }: NavbarProps) {
                   cancelAdminClose();
                   setAdminOpen((v) => !v);
                   setUserOpen(false);
-                  setOpen(false);
                 }}
               >
                 Data
@@ -251,14 +243,14 @@ export default function Navbar({ items, menuItems }: NavbarProps) {
                       className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
                       onClick={() => setAdminOpen(false)}
                     >
-                      Login Logs
+                      Riwayat Login Pengguna
                     </Link>
                     <Link
                       href="/admin/users"
                       className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
                       onClick={() => setAdminOpen(false)}
                     >
-                      Users
+                      Daftar Pengguna
                     </Link>
                     <Link
                       href="/admin/borrowed-book-requests"
@@ -288,7 +280,6 @@ export default function Navbar({ items, menuItems }: NavbarProps) {
                 cancelUserClose();
                 setUserOpen(true);
                 setAdminOpen(false);
-                setOpen(false);
               }}
               onMouseLeave={() => {
                 scheduleUserClose();
@@ -308,7 +299,6 @@ export default function Navbar({ items, menuItems }: NavbarProps) {
                   cancelUserClose();
                   setUserOpen((v) => !v);
                   setAdminOpen(false);
-                  setOpen(false);
                 }}
               >
                 {displayName}
@@ -330,9 +320,9 @@ export default function Navbar({ items, menuItems }: NavbarProps) {
                       className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
                       onClick={() => setUserOpen(false)}
                     >
-                      Riwayat Peminjaman
+                      Buku Dipinjam
                     </Link>
-                     <Link
+                    <Link
                       href="/auth/logout"
                       className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
                       onClick={() => setUserOpen(false)}
