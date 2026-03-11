@@ -47,16 +47,13 @@ export default function Navbar({ items }: NavbarProps) {
   const adminRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
 
-  const [isAuthed, setIsAuthed] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return Boolean(window.localStorage.getItem("token"));
-  });
+  const [isAuthed, setIsAuthed] = useState<boolean>(false);
 
   const [me, setMe] = useState<any>(null);
 
   const navItems: NavbarItem[] = items ?? [
     { label: "Beranda", href: "/" },
-    { label: "Koleksi", href: "#", disabled: true },
+    { label: "Koleksi", href: "/koleksi" },
     { label: "Isi Buku Tamu", href: "#", disabled: true },
   ];
 
