@@ -241,9 +241,7 @@ export default function KoleksiDetailPage() {
             Koleksi
           </a>
           <span>/</span>
-          <span className="line-clamp-1 text-slate-700">
-            {book?.judul ?? "Detail"}
-          </span>
+          <span className="line-clamp-1 text-slate-700">{cleanText(book?.judul) || "Detail"}</span>
         </div>
       </div>
 
@@ -347,12 +345,8 @@ export default function KoleksiDetailPage() {
               </div>
               {book.no_panggil && (
                 <div className="mt-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-center">
-                  <p className="text-[11px] font-medium uppercase tracking-widest text-slate-400">
-                    No. Panggil
-                  </p>
-                  <p className="mt-0.5 font-mono text-sm font-semibold text-slate-700">
-                    {book.no_panggil}
-                  </p>
+                  <p className="text-[11px] font-medium uppercase tracking-widest text-slate-400">No. Panggil</p>
+                  <p className="mt-0.5 font-mono text-sm font-semibold text-slate-700">{cleanText(book.no_panggil)}</p>
                 </div>
               )}
             </div>
@@ -368,7 +362,7 @@ export default function KoleksiDetailPage() {
                 )}
               </div>
               <h1 className="text-2xl font-bold leading-snug text-slate-800">
-                {book.judul ?? "Tanpa Judul"}
+                {cleanText(book.judul) || "Tanpa Judul"}
               </h1>
               <p className="mt-1 text-base text-slate-500">
                 {cleanText(book.nama_orang) || "Penulis tidak diketahui"}
@@ -402,22 +396,13 @@ export default function KoleksiDetailPage() {
               {/* Details grid */}
               <dl className="grid grid-cols-1 gap-x-10 gap-y-5 sm:grid-cols-2">
                 <DetailItem label="Penerbit" value={cleanText(book.penerbit)} />
-                <DetailItem
-                  label="Tahun Terbit"
-                  value={book.tahun_terbit?.toString()}
-                />
-                <DetailItem label="ISBN" value={book.isbn} />
-                <DetailItem label="Edisi" value={book.edisi} />
-                <DetailItem label="Bahasa" value={book.bahasa} />
-                <DetailItem
-                  label="Tempat Terbit"
-                  value={cleanText(book.tempat_terbit)}
-                />
-                <DetailItem
-                  label="Lembaga Pemilik"
-                  value={cleanText(book.lembaga_pemilik)}
-                />
-                <DetailItem label="Sumber" value={book.sumber} />
+                <DetailItem label="Tahun Terbit" value={book.tahun_terbit?.toString()} />
+                <DetailItem label="ISBN" value={cleanText(book.isbn)} />
+                <DetailItem label="Edisi" value={cleanText(book.edisi)} />
+                <DetailItem label="Bahasa" value={cleanText(book.bahasa)} />
+                <DetailItem label="Tempat Terbit" value={cleanText(book.tempat_terbit)} />
+                <DetailItem label="Lembaga Pemilik" value={cleanText(book.lembaga_pemilik)} />
+                <DetailItem label="Sumber" value={cleanText(book.sumber)} />
               </dl>
 
               {/* Location banner */}
@@ -444,12 +429,8 @@ export default function KoleksiDetailPage() {
                     />
                   </svg>
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-widest text-[#6b3a22]/60">
-                      Lokasi Rak
-                    </p>
-                    <p className="text-sm font-semibold text-[#6b3a22]">
-                      {book.lokasi}
-                    </p>
+                    <p className="text-[11px] font-medium uppercase tracking-widest text-[#6b3a22]/60">Lokasi Rak</p>
+                    <p className="text-sm font-semibold text-[#6b3a22]">{cleanText(book.lokasi)}</p>
                   </div>
                 </div>
               )}
