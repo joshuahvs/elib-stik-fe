@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Navbar from "@/app/components/Navbar";
 import PrimaryButton from "@/app/components/PrimaryButton";
 import Link from "next/link";
+import { API_URL } from "@/app/lib/api";
 import {
   fetchAdminUsers,
   type AdminUserRow,
@@ -96,8 +97,8 @@ export default function AdminUsersPage() {
       setMeLoading(false);
       return;
     }
-
-    fetch("http://localhost:8080/auth/me", {
+    
+    fetch(`${API_URL}/auth/me`, {
       headers: { Authorization: `Bearer ${t}` },
     })
       .then((r) => r.json())

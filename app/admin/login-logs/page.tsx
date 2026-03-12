@@ -5,6 +5,7 @@ import Navbar from "@/app/components/Navbar";
 import PrimaryButton from "@/app/components/PrimaryButton";
 import Link from "next/link";
 import { fetchLoginLogs, type LoginLog, type LoginLogStatus } from "@/app/lib/adminLoginLogs";
+import { API_URL } from "@/app/lib/api";
 
 function formatWIB(iso: string) {
   const d = new Date(iso);
@@ -72,7 +73,7 @@ export default function AdminLoginLogsPage() {
       return;
     }
 
-    fetch("http://localhost:8080/auth/me", {
+    fetch(`${API_URL}/auth/me`, {
       headers: { Authorization: `Bearer ${t}` },
     })
       .then((r) => r.json())
