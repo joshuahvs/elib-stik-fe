@@ -42,6 +42,7 @@ export default function KoleksiDetailPage() {
           <a href="/koleksi" className="transition hover:text-[#6b3a22]">Koleksi</a>
           <span>/</span>
           <span className="line-clamp-1 text-slate-700">{cleanText(book?.judul) || "Detail"}</span>
+          <span className="line-clamp-1 text-slate-700">{cleanText(book?.judul) || "Detail"}</span>
         </div>
       </div>
 
@@ -131,6 +132,7 @@ export default function KoleksiDetailPage() {
               </div>
               <h1 className="text-2xl font-bold leading-snug text-slate-800">
                 {cleanText(book.judul) || "Tanpa Judul"}
+                {cleanText(book.judul) || "Tanpa Judul"}
               </h1>
               <p className="mt-1 text-base text-slate-500">
                 {cleanText(book.nama_orang) || "Penulis tidak diketahui"}
@@ -140,14 +142,26 @@ export default function KoleksiDetailPage() {
 
               {/* Details grid */}
               <dl className="grid grid-cols-1 gap-x-10 gap-y-5 sm:grid-cols-2">
+                <DetailItem label="Jenis Koleksi" value={cleanText(book.jenis_koleksi)} />
                 <DetailItem label="Penerbit" value={cleanText(book.penerbit)} />
                 <DetailItem label="Tahun Terbit" value={book.tahun_terbit?.toString()} />
                 <DetailItem label="ISBN" value={cleanText(book.isbn)} />
+                <DetailItem label="ISSN" value={cleanText(book.issn ?? book.issn_or_isbn)} />
                 <DetailItem label="Edisi" value={cleanText(book.edisi)} />
-                <DetailItem label="Bahasa" value={cleanText(book.bahasa)} />
+                <DetailItem label="Bahasa" value={cleanText(book.bahasa ?? book.kode_bahasa)} />
                 <DetailItem label="Tempat Terbit" value={cleanText(book.tempat_terbit)} />
                 <DetailItem label="Lembaga Pemilik" value={cleanText(book.lembaga_pemilik)} />
-                <DetailItem label="Sumber" value={cleanText(book.sumber)} />
+                <DetailItem label="Sumber" value={cleanText(book.sumber ?? book.sumber_data ?? book.sumber_koleksi)} />
+                <DetailItem label="Volume" value={cleanText(book.volume)} />
+                <DetailItem label="Deskripsi Fisik" value={cleanText(book.deskripsi_fisik)} />
+                <DetailItem label="Catatan Umum" value={cleanText(book.catatan_umum)} />
+                <DetailItem label="Nama Badan" value={cleanText(book.nama_badan)} />
+                <DetailItem label="Nama Orang Tambahan" value={cleanText(book.nama_orang_tambahan)} />
+                <DetailItem label="Kata Kunci" value={cleanText(book.kata_kunci)} />
+                <DetailItem label="Abstrak" value={cleanText(book.abstrak)} />
+                <DetailItem label="Frekuensi Terbit" value={cleanText(book.frekuensi_terbit)} />
+                <DetailItem label="Penerbitan" value={cleanText(book.penerbitan)} />
+                <DetailItem label="Barcode" value={cleanText(book.barcode)} />
               </dl>
 
               {/* Location banner */}
