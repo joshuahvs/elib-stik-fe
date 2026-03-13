@@ -7,7 +7,6 @@ export interface BukuRow {
   judul: string | null;
   url_sampul: string | null;
   file_path?: string | null;
-  filePath?: string | null;
   no_panggil: string | null;
   nama_orang: string | null;
   subjek: string | null;
@@ -22,8 +21,6 @@ export interface BukuRow {
   tempat_terbit: string | null;
   penerbit: string | null;
   tahun_terbit: number | null;
-  // Fields from specific collection tables
-  file_path?: string | null;
   deskripsi_fisik?: string | null;
   volume?: string | null;
   catatan_umum?: string | null;
