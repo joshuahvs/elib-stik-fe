@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { fetchDigitalSignedUrl, openInNewTab } from "@/app/lib/booksDigital";
 import { fetchRiwayatPeminjamanMe } from "@/app/lib/peminjamanBuku";
+import ErrorMessage, { getErrorMessage } from "@/app/components/ErrorMessage";
 
 type BorrowStatus =
   | "Diajukan"
@@ -175,6 +176,7 @@ export default function BorrowedBooksPage() {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [books, setBooks] = useState<BorrowedBook[]>([]);
   const [totalItems, setTotalItems] = useState(0);
 
@@ -189,14 +191,14 @@ export default function BorrowedBooksPage() {
 
     try {
       setOpeningDigitalId(digitalId);
+      setActionError(null);
       const { signedUrl } = await fetchDigitalSignedUrl({
         token,
         bookId: digitalId,
       });
       openInNewTab(signedUrl);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Gagal membuka buku digital";
-      alert(msg);
+      setActionError(getErrorMessage(e, "Gagal membuka buku digital"));
     } finally {
       setOpeningDigitalId(null);
     }
@@ -313,6 +315,8 @@ export default function BorrowedBooksPage() {
           </div>
         </div>
 
+        <ErrorMessage error={actionError} className="mt-6" />
+
         <section className="mt-8 rounded-2xl border bg-white">
           <div className="px-6 py-5 border-b">
             <div className="text-sm text-slate-600">
@@ -351,9 +355,8 @@ export default function BorrowedBooksPage() {
           ) : loading ? (
             <div className="px-6 py-12 text-center text-slate-600">Memuat…</div>
           ) : error ? (
-            <div className="px-6 py-12 text-center text-slate-600">
-              <div className="font-semibold text-slate-900">Gagal memuat</div>
-              <div className="mt-2">{error}</div>
+            <div className="px-6 py-6">
+              <ErrorMessage error={error} />
             </div>
           ) : totalItems === 0 ? (
             <div className="px-6 py-12 text-center text-slate-600">

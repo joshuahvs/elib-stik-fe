@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import ErrorMessage from "@/app/components/ErrorMessage";
 
 function parseHashParams(hash: string): Record<string, string> {
   const clean = hash.startsWith("#") ? hash.slice(1) : hash;
@@ -80,13 +81,13 @@ function AuthCallbackInner() {
 
           {error ? (
             <div className="text-center">
-              <p className="font-medium text-red-700">
-                Gagal memverifikasi email
-              </p>
-              <p className="mt-2 break-words text-slate-600">
-                {errorDescription ||
-                  "Link verifikasi tidak valid atau sudah kedaluwarsa."}
-              </p>
+              <ErrorMessage
+                error={
+                  errorDescription ||
+                  "Link verifikasi tidak valid atau sudah kedaluwarsa."
+                }
+                className="mx-auto max-w-md text-left"
+              />
               <div className="mt-6 flex items-center justify-center gap-3">
                 <Link
                   href="/auth/register"

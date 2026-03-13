@@ -13,6 +13,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { API_URL } from "@/app/lib/api";
 import InputField from "@/app/components/InputField";
 import PrimaryButton from "@/app/components/PrimaryButton";
+import ErrorMessage from "@/app/components/ErrorMessage";
 
 function parseHashParams(hash: string): Record<string, string> {
   const clean = hash.startsWith("#") ? hash.slice(1) : hash;
@@ -190,7 +191,10 @@ function ResetPasswordInner() {
 
           {!isRecoveryLink ? (
             <div className="text-center">
-              <p className="text-red-700 font-medium">Link tidak valid</p>
+              <ErrorMessage
+                error="Link tidak valid"
+                className="mx-auto max-w-md"
+              />
               <p className="text-slate-600 mt-2">
                 Link reset password tidak berisi token yang dibutuhkan.
               </p>
@@ -245,19 +249,21 @@ function ResetPasswordInner() {
               />
 
               {message ? (
-                <div
-                  className={[
-                    "text-sm rounded-lg p-3 border",
-                    status === "success"
-                      ? "bg-green-50 border-green-200 text-green-800"
-                      : status === "error"
-                        ? "bg-red-50 border-red-200 text-red-800"
+                status === "error" ? (
+                  <ErrorMessage error={message} />
+                ) : (
+                  <div
+                    className={[
+                      "text-sm rounded-lg p-3 border",
+                      status === "success"
+                        ? "bg-green-50 border-green-200 text-green-800"
                         : "bg-slate-50 border-slate-200 text-slate-700",
-                  ].join(" ")}
-                  role={status === "error" ? "alert" : "status"}
-                >
-                  {message}
-                </div>
+                    ].join(" ")}
+                    role={status === "success" ? "status" : "status"}
+                  >
+                    {message}
+                  </div>
+                )
               ) : null}
 
               <PrimaryButton type="submit" disabled={status === "submitting"}>
