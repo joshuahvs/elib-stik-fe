@@ -11,7 +11,6 @@ type BookDigitalMeta = {
   id?: string | number | null;
   title?: string | null;
   file_path?: string | null;
-  filePath?: string | null;
 };
 
 // Strips stringified array artifacts like ['Value'] or ["Value"]
@@ -117,11 +116,10 @@ export default function KoleksiDetailPage() {
     const fp =
       book?.file_path ??
       book?.filePath ??
-      digitalMeta?.file_path ??
-      digitalMeta?.filePath;
+      digitalMeta?.file_path;
 
     return typeof fp === "string" && fp.trim().length > 0;
-  }, [book?.file_path, book?.filePath, digitalMeta?.file_path, digitalMeta?.filePath]);
+  }, [book?.file_path, book?.filePath, digitalMeta?.file_path]);
 
   const akhirPinjam = useMemo(() => {
     if (!tanggalPinjam) return "";
@@ -389,6 +387,15 @@ export default function KoleksiDetailPage() {
                     className="inline-flex h-10 items-center rounded-lg bg-[#6b3a22] px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {opening ? "Membuka…" : "Baca Digital"}
+                  </button>
+                ) : null}
+                {!hasDigital ? (
+                  <button
+                    type="button"
+                    disabled
+                    className="inline-flex h-10 items-center rounded-lg bg-[#6b3a22] px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Buku Digital Belum Tersedia
                   </button>
                 ) : null}
               </div>
