@@ -6,11 +6,19 @@ import { fetchBukuById, type BukuRow } from "@/app/lib/koleksi";
 import { API_URL } from "@/app/lib/api";
 import { fetchDigitalSignedUrl, openInNewTab } from "@/app/lib/booksDigital";
 import { ajukanPeminjamanBuku } from "@/app/lib/peminjamanBuku";
+import ErrorMessage, { getErrorMessage } from "@/app/components/ErrorMessage";
 
 type BookDigitalMeta = {
   id?: string | number | null;
   title?: string | null;
   file_path?: string | null;
+};
+
+const formatLocalYmd = (date: Date): string => {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 };
 
 // Strips stringified array artifacts like ['Value'] or ["Value"]
@@ -29,12 +37,17 @@ export default function KoleksiDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
 
+  const todayYmd = useMemo(() => formatLocalYmd(new Date()), []);
+
   const [token, setToken] = useState<string | null>(null);
   const [digitalMeta, setDigitalMeta] = useState<BookDigitalMeta | null>(null);
   const [opening, setOpening] = useState(false);
 
+  const [pageError, setPageError] = useState<string | null>(null);
+
   const [submittingLoan, setSubmittingLoan] = useState(false);
-  const [loanMessage, setLoanMessage] = useState<string | null>(null);
+  const [loanError, setLoanError] = useState<string | null>(null);
+  const [loanSuccess, setLoanSuccess] = useState<string | null>(null);
   const [loanModalOpen, setLoanModalOpen] = useState(false);
   const [tanggalPinjam, setTanggalPinjam] = useState<string>("");
   const [periodeHari, setPeriodeHari] = useState<number>(7);
@@ -113,10 +126,7 @@ export default function KoleksiDetailPage() {
   }, [params.id]);
 
   const hasDigital = useMemo(() => {
-    const fp =
-      book?.file_path ??
-      book?.filePath ??
-      digitalMeta?.file_path;
+    const fp = book?.file_path ?? book?.filePath ?? digitalMeta?.file_path;
 
     return typeof fp === "string" && fp.trim().length > 0;
   }, [book?.file_path, book?.filePath, digitalMeta?.file_path]);
@@ -148,14 +158,14 @@ export default function KoleksiDetailPage() {
 
     try {
       setOpening(true);
+      setPageError(null);
       const { signedUrl } = await fetchDigitalSignedUrl({
         token: t,
         bookId: digitalId,
       });
       openInNewTab(signedUrl);
     } catch (e) {
-      const msg = "Buku Digital Belum Tersedia";
-      alert(msg);
+      setPageError(getErrorMessage(e, "Buku Digital Belum Tersedia"));
     } finally {
       setOpening(false);
     }
@@ -168,22 +178,20 @@ export default function KoleksiDetailPage() {
       return;
     }
     if (!numericBukuId) {
-      setLoanMessage("ID buku tidak valid untuk pengajuan peminjaman.");
+      setLoanError("ID buku tidak valid untuk pengajuan peminjaman.");
+      setLoanSuccess(null);
       return;
     }
 
     if (!tanggalPinjam) {
-      const now = new Date();
-      const yyyy = now.getFullYear();
-      const mm = String(now.getMonth() + 1).padStart(2, "0");
-      const dd = String(now.getDate()).padStart(2, "0");
-      setTanggalPinjam(`${yyyy}-${mm}-${dd}`);
+      setTanggalPinjam(todayYmd);
     }
     if (!Number.isFinite(periodeHari) || periodeHari <= 0) {
       setPeriodeHari(7);
     }
 
-    setLoanMessage(null);
+    setLoanError(null);
+    setLoanSuccess(null);
     setLoanModalOpen(true);
   }
 
@@ -195,32 +203,38 @@ export default function KoleksiDetailPage() {
     }
 
     if (!numericBukuId) {
-      alert("ID buku tidak valid untuk pengajuan peminjaman.");
+      setLoanError("ID buku tidak valid untuk pengajuan peminjaman.");
+      setLoanSuccess(null);
       return;
     }
 
     if (!tanggalPinjam || !akhirPinjam) {
-      setLoanMessage(
-        "Silakan pilih tanggal peminjaman dan periode peminjaman.",
-      );
+      setLoanError("Silakan pilih tanggal peminjaman dan periode peminjaman.");
+      setLoanSuccess(null);
+      return;
+    }
+
+    const currentTodayYmd = formatLocalYmd(new Date());
+    if (tanggalPinjam < currentTodayYmd) {
+      setLoanError("Tanggal peminjaman tidak boleh di masa lalu.");
+      setLoanSuccess(null);
       return;
     }
 
     try {
       setSubmittingLoan(true);
-      setLoanMessage(null);
+      setLoanError(null);
+      setLoanSuccess(null);
       await ajukanPeminjamanBuku({
         token: t,
         bukuId: numericBukuId,
         tanggal_peminjaman: tanggalPinjam,
         akhir_peminjaman: akhirPinjam,
       });
-      setLoanMessage("Pengajuan peminjaman berhasil dikirim.");
+      setLoanSuccess("Pengajuan peminjaman berhasil dikirim.");
       setLoanModalOpen(false);
     } catch (e) {
-      const msg =
-        e instanceof Error ? e.message : "Gagal mengajukan peminjaman";
-      setLoanMessage(msg);
+      setLoanError(getErrorMessage(e, "Gagal mengajukan peminjaman"));
     } finally {
       setSubmittingLoan(false);
     }
@@ -239,8 +253,12 @@ export default function KoleksiDetailPage() {
             Koleksi
           </a>
           <span>/</span>
-          <span className="line-clamp-1 text-slate-700">{cleanText(book?.judul) || "Detail"}</span>
-          <span className="line-clamp-1 text-slate-700">{cleanText(book?.judul) || "Detail"}</span>
+          <span className="line-clamp-1 text-slate-700">
+            {cleanText(book?.judul) || "Detail"}
+          </span>
+          <span className="line-clamp-1 text-slate-700">
+            {cleanText(book?.judul) || "Detail"}
+          </span>
         </div>
       </div>
 
@@ -267,9 +285,11 @@ export default function KoleksiDetailPage() {
           Kembali ke Koleksi
         </button>
 
-        {loanMessage ? (
-          <div className="mb-6 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-            {loanMessage}
+        <ErrorMessage error={pageError} className="mb-6" />
+        <ErrorMessage error={loanError} className="mb-6" />
+        {loanSuccess ? (
+          <div className="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+            {loanSuccess}
           </div>
         ) : null}
 
@@ -344,8 +364,12 @@ export default function KoleksiDetailPage() {
               </div>
               {book.no_panggil && (
                 <div className="mt-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-center">
-                  <p className="text-[11px] font-medium uppercase tracking-widest text-slate-400">No. Panggil</p>
-                  <p className="mt-0.5 font-mono text-sm font-semibold text-slate-700">{cleanText(book.no_panggil)}</p>
+                  <p className="text-[11px] font-medium uppercase tracking-widest text-slate-400">
+                    No. Panggil
+                  </p>
+                  <p className="mt-0.5 font-mono text-sm font-semibold text-slate-700">
+                    {cleanText(book.no_panggil)}
+                  </p>
                 </div>
               )}
             </div>
@@ -404,25 +428,69 @@ export default function KoleksiDetailPage() {
 
               {/* Details grid */}
               <dl className="grid grid-cols-1 gap-x-10 gap-y-5 sm:grid-cols-2">
-                <DetailItem label="Jenis Koleksi" value={cleanText(book.jenis_koleksi)} />
+                <DetailItem
+                  label="Jenis Koleksi"
+                  value={cleanText(book.jenis_koleksi)}
+                />
                 <DetailItem label="Penerbit" value={cleanText(book.penerbit)} />
-                <DetailItem label="Tahun Terbit" value={book.tahun_terbit?.toString()} />
+                <DetailItem
+                  label="Tahun Terbit"
+                  value={book.tahun_terbit?.toString()}
+                />
                 <DetailItem label="ISBN" value={cleanText(book.isbn)} />
-                <DetailItem label="ISSN" value={cleanText(book.issn ?? book.issn_or_isbn)} />
+                <DetailItem
+                  label="ISSN"
+                  value={cleanText(book.issn ?? book.issn_or_isbn)}
+                />
                 <DetailItem label="Edisi" value={cleanText(book.edisi)} />
-                <DetailItem label="Bahasa" value={cleanText(book.bahasa ?? book.kode_bahasa)} />
-                <DetailItem label="Tempat Terbit" value={cleanText(book.tempat_terbit)} />
-                <DetailItem label="Lembaga Pemilik" value={cleanText(book.lembaga_pemilik)} />
-                <DetailItem label="Sumber" value={cleanText(book.sumber ?? book.sumber_data ?? book.sumber_koleksi)} />
+                <DetailItem
+                  label="Bahasa"
+                  value={cleanText(book.bahasa ?? book.kode_bahasa)}
+                />
+                <DetailItem
+                  label="Tempat Terbit"
+                  value={cleanText(book.tempat_terbit)}
+                />
+                <DetailItem
+                  label="Lembaga Pemilik"
+                  value={cleanText(book.lembaga_pemilik)}
+                />
+                <DetailItem
+                  label="Sumber"
+                  value={cleanText(
+                    book.sumber ?? book.sumber_data ?? book.sumber_koleksi,
+                  )}
+                />
                 <DetailItem label="Volume" value={cleanText(book.volume)} />
-                <DetailItem label="Deskripsi Fisik" value={cleanText(book.deskripsi_fisik)} />
-                <DetailItem label="Catatan Umum" value={cleanText(book.catatan_umum)} />
-                <DetailItem label="Nama Badan" value={cleanText(book.nama_badan)} />
-                <DetailItem label="Nama Orang Tambahan" value={cleanText(book.nama_orang_tambahan)} />
-                <DetailItem label="Kata Kunci" value={cleanText(book.kata_kunci)} />
+                <DetailItem
+                  label="Deskripsi Fisik"
+                  value={cleanText(book.deskripsi_fisik)}
+                />
+                <DetailItem
+                  label="Catatan Umum"
+                  value={cleanText(book.catatan_umum)}
+                />
+                <DetailItem
+                  label="Nama Badan"
+                  value={cleanText(book.nama_badan)}
+                />
+                <DetailItem
+                  label="Nama Orang Tambahan"
+                  value={cleanText(book.nama_orang_tambahan)}
+                />
+                <DetailItem
+                  label="Kata Kunci"
+                  value={cleanText(book.kata_kunci)}
+                />
                 <DetailItem label="Abstrak" value={cleanText(book.abstrak)} />
-                <DetailItem label="Frekuensi Terbit" value={cleanText(book.frekuensi_terbit)} />
-                <DetailItem label="Penerbitan" value={cleanText(book.penerbitan)} />
+                <DetailItem
+                  label="Frekuensi Terbit"
+                  value={cleanText(book.frekuensi_terbit)}
+                />
+                <DetailItem
+                  label="Penerbitan"
+                  value={cleanText(book.penerbitan)}
+                />
                 <DetailItem label="Barcode" value={cleanText(book.barcode)} />
               </dl>
 
@@ -450,8 +518,12 @@ export default function KoleksiDetailPage() {
                     />
                   </svg>
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-widest text-[#6b3a22]/60">Lokasi Rak</p>
-                    <p className="text-sm font-semibold text-[#6b3a22]">{cleanText(book.lokasi)}</p>
+                    <p className="text-[11px] font-medium uppercase tracking-widest text-[#6b3a22]/60">
+                      Lokasi Rak
+                    </p>
+                    <p className="text-sm font-semibold text-[#6b3a22]">
+                      {cleanText(book.lokasi)}
+                    </p>
                   </div>
                 </div>
               )}
@@ -480,8 +552,20 @@ export default function KoleksiDetailPage() {
                   </label>
                   <input
                     type="date"
+                    min={todayYmd}
                     value={tanggalPinjam}
-                    onChange={(e) => setTanggalPinjam(e.target.value)}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setTanggalPinjam(next);
+                      if (next && next < todayYmd) {
+                        setLoanError(
+                          "Tanggal peminjaman tidak boleh di masa lalu.",
+                        );
+                        setLoanSuccess(null);
+                      } else if (loanError) {
+                        setLoanError(null);
+                      }
+                    }}
                     className="h-11 w-full rounded-xl border border-slate-300 px-3 text-black"
                   />
                 </div>
