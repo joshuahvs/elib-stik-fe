@@ -4,17 +4,33 @@ import { useEffect, useState } from "react";
 import Navbar from "@/app/components/Navbar";
 import PrimaryButton from "@/app/components/PrimaryButton";
 import Link from "next/link";
-import { fetchLoginLogs, type LoginLog, type LoginLogStatus } from "@/app/lib/adminLoginLogs";
+import {
+  fetchLoginLogs,
+  type LoginLog,
+  type LoginLogStatus,
+} from "@/app/lib/adminLoginLogs";
+import { API_URL } from "@/app/lib/api";
+import ErrorMessage from "@/app/components/ErrorMessage";
 
 function formatWIB(iso: string) {
   const d = new Date(iso);
 
   const day = String(
-    Number(new Intl.DateTimeFormat("id-ID", { timeZone: "Asia/Jakarta", day: "2-digit" }).format(d))
+    Number(
+      new Intl.DateTimeFormat("id-ID", {
+        timeZone: "Asia/Jakarta",
+        day: "2-digit",
+      }).format(d),
+    ),
   ).padStart(2, "0");
 
   const month = String(
-    Number(new Intl.DateTimeFormat("id-ID", { timeZone: "Asia/Jakarta", month: "2-digit" }).format(d))
+    Number(
+      new Intl.DateTimeFormat("id-ID", {
+        timeZone: "Asia/Jakarta",
+        month: "2-digit",
+      }).format(d),
+    ),
   ).padStart(2, "0");
 
   const year = new Intl.DateTimeFormat("id-ID", {
@@ -72,7 +88,7 @@ export default function AdminLoginLogsPage() {
       return;
     }
 
-    fetch("http://localhost:8080/auth/me", {
+    fetch(`${API_URL}/auth/me`, {
       headers: { Authorization: `Bearer ${t}` },
     })
       .then((r) => r.json())
@@ -121,7 +137,6 @@ export default function AdminLoginLogsPage() {
 
   return (
     <div className="min-h-screen bg-white">
-
       <main className="mx-auto max-w-6xl px-6 py-10">
         {!meLoading && !token ? (
           <div className="bg-white rounded-2xl shadow-xl p-8 md:p-10 max-w-xl mx-auto text-center">
@@ -138,20 +153,26 @@ export default function AdminLoginLogsPage() {
         {!meLoading && token && !isAdmin ? (
           <div className="bg-white rounded-2xl shadow-xl p-8 md:p-10 max-w-xl mx-auto text-center">
             <h1 className="text-2xl font-bold text-slate-900">Riwayat Login</h1>
-            <p className="mt-2 text-slate-600">Halaman ini hanya bisa diakses oleh admin.</p>
+            <p className="mt-2 text-slate-600">
+              Halaman ini hanya bisa diakses oleh admin.
+            </p>
           </div>
         ) : null}
 
         {!meLoading && token && isAdmin ? (
           <>
             <div className="flex items-center justify-between mb-8">
-              <h1 className="text-2xl font-bold text-slate-900">Riwayat Login</h1>
+              <h1 className="text-2xl font-bold text-slate-900">
+                Riwayat Login
+              </h1>
             </div>
 
             {/* FILTER BAR */}
             <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
               <div>
-                <label className="block text-sm font-semibold text-slate-800 mb-2">Dari Tanggal</label>
+                <label className="block text-sm font-semibold text-slate-800 mb-2">
+                  Dari Tanggal
+                </label>
                 <input
                   type="date"
                   value={from}
@@ -161,7 +182,9 @@ export default function AdminLoginLogsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-800 mb-2">Sampai Tanggal</label>
+                <label className="block text-sm font-semibold text-slate-800 mb-2">
+                  Sampai Tanggal
+                </label>
                 <input
                   type="date"
                   value={to}
@@ -171,7 +194,9 @@ export default function AdminLoginLogsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-800 mb-2">Status</label>
+                <label className="block text-sm font-semibold text-slate-800 mb-2">
+                  Status
+                </label>
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value as any)}
@@ -184,7 +209,9 @@ export default function AdminLoginLogsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-800 mb-2">Peran</label>
+                <label className="block text-sm font-semibold text-slate-800 mb-2">
+                  Peran
+                </label>
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
@@ -199,7 +226,9 @@ export default function AdminLoginLogsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-800 mb-2">E-mail</label>
+                <label className="block text-sm font-semibold text-slate-800 mb-2">
+                  E-mail
+                </label>
                 <input
                   type="text"
                   value={email}
@@ -210,17 +239,17 @@ export default function AdminLoginLogsPage() {
               </div>
 
               <div className="md:justify-self-end">
-                <PrimaryButton type="button" onClick={load} className="h-11 px-8">
+                <PrimaryButton
+                  type="button"
+                  onClick={load}
+                  className="h-11 px-8"
+                >
                   Filter
                 </PrimaryButton>
               </div>
             </div>
 
-            {error ? (
-              <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
-                {error}
-              </div>
-            ) : null}
+            {error ? <ErrorMessage error={error} className="mt-6" /> : null}
 
             {/* TABLE */}
             <div className="mt-10">
@@ -233,7 +262,11 @@ export default function AdminLoginLogsPage() {
                   <div className="px-5 py-3">ID Pengguna</div>
                 </div>
 
-                {isLoading ? <div className="p-8 text-center text-slate-600">Memuat data…</div> : null}
+                {isLoading ? (
+                  <div className="p-8 text-center text-slate-600">
+                    Memuat data…
+                  </div>
+                ) : null}
 
                 {empty ? (
                   <div className="p-8 text-center text-slate-600">
@@ -245,7 +278,9 @@ export default function AdminLoginLogsPage() {
                   <div className="max-h-[520px] overflow-y-auto divide-y text-slate-900">
                     {logs.map((row) => (
                       <div key={row.id} className="grid grid-cols-5 text-sm">
-                        <div className="px-5 py-4">{formatWIB(row.created_at)}</div>
+                        <div className="px-5 py-4">
+                          {formatWIB(row.created_at)}
+                        </div>
                         <div className="px-5 py-4">
                           <span
                             className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${

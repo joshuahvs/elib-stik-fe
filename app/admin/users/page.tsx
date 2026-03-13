@@ -4,26 +4,34 @@ import { useEffect, useState } from "react";
 import Navbar from "@/app/components/Navbar";
 import PrimaryButton from "@/app/components/PrimaryButton";
 import Link from "next/link";
+import { API_URL } from "@/app/lib/api";
 import {
   fetchAdminUsers,
   type AdminUserRow,
   type UserStatus,
   type UserRole,
 } from "@/app/lib/adminUsers";
+import ErrorMessage from "@/app/components/ErrorMessage";
 
 function formatWIB(iso: string) {
   const d = new Date(iso);
 
   const day = String(
     Number(
-      new Intl.DateTimeFormat("id-ID", { timeZone: "Asia/Jakarta", day: "2-digit" }).format(d)
-    )
+      new Intl.DateTimeFormat("id-ID", {
+        timeZone: "Asia/Jakarta",
+        day: "2-digit",
+      }).format(d),
+    ),
   ).padStart(2, "0");
 
   const month = String(
     Number(
-      new Intl.DateTimeFormat("id-ID", { timeZone: "Asia/Jakarta", month: "2-digit" }).format(d)
-    )
+      new Intl.DateTimeFormat("id-ID", {
+        timeZone: "Asia/Jakarta",
+        month: "2-digit",
+      }).format(d),
+    ),
   ).padStart(2, "0");
 
   const year = new Intl.DateTimeFormat("id-ID", {
@@ -97,7 +105,7 @@ export default function AdminUsersPage() {
       return;
     }
 
-    fetch("http://localhost:8080/auth/me", {
+    fetch(`${API_URL}/auth/me`, {
       headers: { Authorization: `Bearer ${t}` },
     })
       .then((r) => r.json())
@@ -144,11 +152,12 @@ export default function AdminUsersPage() {
 
   return (
     <div className="min-h-screen bg-white">
-
       <main className="mx-auto max-w-[1400px] px-6 py-10">
         {!meLoading && !token ? (
           <div className="bg-white rounded-2xl shadow-xl p-8 md:p-10 max-w-xl mx-auto text-center">
-            <h1 className="text-2xl font-bold text-slate-900">Daftar Pengguna</h1>
+            <h1 className="text-2xl font-bold text-slate-900">
+              Daftar Pengguna
+            </h1>
             <p className="mt-2 text-slate-600">Kamu belum login.</p>
             <div className="mt-6">
               <Link href="/auth/login" className="underline text-slate-900">
@@ -160,20 +169,28 @@ export default function AdminUsersPage() {
 
         {!meLoading && token && !isAdmin ? (
           <div className="bg-white rounded-2xl shadow-xl p-8 md:p-10 max-w-xl mx-auto text-center">
-            <h1 className="text-2xl font-bold text-slate-900">Daftar Pengguna</h1>
-            <p className="mt-2 text-slate-600">Halaman ini hanya bisa diakses oleh admin.</p>
+            <h1 className="text-2xl font-bold text-slate-900">
+              Daftar Pengguna
+            </h1>
+            <p className="mt-2 text-slate-600">
+              Halaman ini hanya bisa diakses oleh admin.
+            </p>
           </div>
         ) : null}
 
         {!meLoading && token && isAdmin ? (
           <>
             <div className="flex items-center justify-between mb-8">
-              <h1 className="text-2xl font-bold text-slate-900">Daftar Pengguna</h1>
+              <h1 className="text-2xl font-bold text-slate-900">
+                Daftar Pengguna
+              </h1>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
               <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-slate-800 mb-2">Status</label>
+                <label className="block text-sm font-semibold text-slate-800 mb-2">
+                  Status
+                </label>
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value as any)}
@@ -187,7 +204,9 @@ export default function AdminUsersPage() {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-slate-800 mb-2">Peran</label>
+                <label className="block text-sm font-semibold text-slate-800 mb-2">
+                  Peran
+                </label>
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value as any)}
@@ -202,7 +221,9 @@ export default function AdminUsersPage() {
               </div>
 
               <div className="md:col-span-1">
-                <label className="block text-sm font-semibold text-slate-800 mb-2">E-mail</label>
+                <label className="block text-sm font-semibold text-slate-800 mb-2">
+                  E-mail
+                </label>
                 <input
                   type="text"
                   value={email}
@@ -213,23 +234,26 @@ export default function AdminUsersPage() {
               </div>
 
               <div className="md:col-span-1 md:justify-self-end">
-                <PrimaryButton type="button" onClick={load} className="h-11 px-8">
+                <PrimaryButton
+                  type="button"
+                  onClick={load}
+                  className="h-11 px-8"
+                >
                   Filter
                 </PrimaryButton>
               </div>
             </div>
 
-            {error ? (
-              <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
-                {error}
-              </div>
-            ) : null}
+            {error ? <ErrorMessage error={error} className="mt-6" /> : null}
 
             <div className="mt-10">
               <div className="rounded-2xl border overflow-hidden text-slate-900">
                 <div
                   className="grid bg-[#6b3a22] text-white font-semibold text-sm"
-                  style={{ gridTemplateColumns: "1.4fr 1.6fr 1fr 0.8fr 0.9fr 1fr 1.2fr 0.8fr" }}
+                  style={{
+                    gridTemplateColumns:
+                      "1.4fr 1.6fr 1fr 0.8fr 0.9fr 1fr 1.2fr 0.8fr",
+                  }}
                 >
                   <div className="px-4 py-3">Nama</div>
                   <div className="px-4 py-3">E-mail</div>
@@ -241,7 +265,11 @@ export default function AdminUsersPage() {
                   <div className="px-4 py-3">Aksi</div>
                 </div>
 
-                {isLoading ? <div className="p-8 text-center text-slate-600">Memuat data…</div> : null}
+                {isLoading ? (
+                  <div className="p-8 text-center text-slate-600">
+                    Memuat data…
+                  </div>
+                ) : null}
 
                 {empty ? (
                   <div className="p-8 text-center text-slate-600">
@@ -255,23 +283,36 @@ export default function AdminUsersPage() {
                       <div
                         key={u.id}
                         className="grid text-sm items-start"
-                        style={{ gridTemplateColumns: "1.4fr 1.6fr 1fr 0.8fr 0.9fr 1fr 1.2fr 0.8fr" }}
+                        style={{
+                          gridTemplateColumns:
+                            "1.4fr 1.6fr 1fr 0.8fr 0.9fr 1fr 1.2fr 0.8fr",
+                        }}
                       >
                         <div className="px-4 py-4 min-w-0">
-                          <div className="font-medium break-words">{u.nama_lengkap ?? "-"}</div>
-                          <div className="text-xs text-slate-500 break-words">{u.username ?? "-"}</div>
+                          <div className="font-medium break-words">
+                            {u.nama_lengkap ?? "-"}
+                          </div>
+                          <div className="text-xs text-slate-500 break-words">
+                            {u.username ?? "-"}
+                          </div>
                         </div>
 
-                        <div className="px-4 py-4 min-w-0 break-words">{u.email ?? "-"}</div>
+                        <div className="px-4 py-4 min-w-0 break-words">
+                          {u.email ?? "-"}
+                        </div>
 
-                        <div className="px-4 py-4 whitespace-nowrap">{roleLabel(u.role)}</div>
+                        <div className="px-4 py-4 whitespace-nowrap">
+                          {roleLabel(u.role)}
+                        </div>
 
-                        <div className="px-4 py-4 whitespace-nowrap">{u.jenjang ?? "-"}</div>
+                        <div className="px-4 py-4 whitespace-nowrap">
+                          {u.jenjang ?? "-"}
+                        </div>
 
                         <div className="px-4 py-4">
                           <span
                             className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${statusBadge(
-                              u.status ?? null
+                              u.status ?? null,
                             )}`}
                           >
                             {u.status ?? "-"}

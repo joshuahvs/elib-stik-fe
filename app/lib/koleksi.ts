@@ -6,6 +6,7 @@ export interface BukuRow {
   url_sumber: string | null;
   judul: string | null;
   url_sampul: string | null;
+  file_path?: string | null;
   no_panggil: string | null;
   nama_orang: string | null;
   subjek: string | null;
@@ -20,6 +21,22 @@ export interface BukuRow {
   tempat_terbit: string | null;
   penerbit: string | null;
   tahun_terbit: number | null;
+  deskripsi_fisik?: string | null;
+  volume?: string | null;
+  catatan_umum?: string | null;
+  sumber_data?: string | null;
+  sumber_koleksi?: string | null;
+  issn_or_isbn?: string | null;
+  issn?: string | null;
+  abstrak?: string | null;
+  kata_kunci?: string | null;
+  kode_bahasa?: string | null;
+  frekuensi_terbit?: string | null;
+  penerbitan?: string | null;
+  angkatan?: number | null;
+  turnitin_persen?: number | null;
+  barcode?: string | null;
+  [key: string]: unknown;
 }
 
 export interface KoleksiResponse {

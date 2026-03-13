@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { fetchDigitalSignedUrl, openInNewTab } from "@/app/lib/booksDigital";
 import { fetchRiwayatPeminjamanMe } from "@/app/lib/peminjamanBuku";
+import ErrorMessage, { getErrorMessage } from "@/app/components/ErrorMessage";
 
 type BorrowStatus =
   | "Diajukan"
@@ -22,6 +23,8 @@ type BorrowedBook = {
   tanggalKembali?: string;
   digitalId?: string;
   status?: string;
+  statusPerpanjangan?: string;
+  akhirPerpanjangan?: string;
 };
 
 function pickFirstString(obj: any, keys: string[]): string | undefined {
@@ -80,6 +83,16 @@ function mapLoanToBorrowedBook(row: any): BorrowedBook {
   const filePath = buku?.file_path ?? buku?.filePath ?? row?.file_path;
   const digitalId = filePath ? String(bukuId ?? "") : undefined;
 
+  const statusPerpanjangan =
+    typeof row?.status_perpanjangan === "string"
+      ? row.status_perpanjangan
+      : typeof row?.statusPerpanjangan === "string"
+        ? row.statusPerpanjangan
+        : undefined;
+
+  const akhirPerpanjangan =
+    toIsoDate(row?.akhir_perpanjangan ?? row?.akhirPerpanjangan) || undefined;
+
   return {
     id: String(loanId),
     judul,
@@ -89,6 +102,8 @@ function mapLoanToBorrowedBook(row: any): BorrowedBook {
     tanggalKembali,
     digitalId: digitalId && digitalId !== "" ? digitalId : undefined,
     status: typeof row?.status === "string" ? row.status : undefined,
+    statusPerpanjangan,
+    akhirPerpanjangan,
   };
 }
 
@@ -116,6 +131,17 @@ function getStatus(item: BorrowedBook, now: Date): BorrowStatus {
   const due = new Date(`${item.jatuhTempo}T23:59:59`);
   if (!Number.isNaN(due.getTime()) && now > due) return "Terlambat";
   return "Dipinjam";
+}
+
+function formatPerpanjanganStatus(statusRaw: any): string | null {
+  if (statusRaw == null) return null;
+  const raw = String(statusRaw).trim();
+  if (!raw) return null;
+  const s = raw.toUpperCase();
+  if (s === "DIAJUKAN") return "Diajukan";
+  if (s === "DISETUJUI") return "Disetujui";
+  if (s === "DITOLAK") return "Ditolak";
+  return raw;
 }
 
 function StatusPill({ status }: { status: BorrowStatus }) {
@@ -150,6 +176,7 @@ export default function BorrowedBooksPage() {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [books, setBooks] = useState<BorrowedBook[]>([]);
   const [totalItems, setTotalItems] = useState(0);
 
@@ -164,14 +191,14 @@ export default function BorrowedBooksPage() {
 
     try {
       setOpeningDigitalId(digitalId);
+      setActionError(null);
       const { signedUrl } = await fetchDigitalSignedUrl({
         token,
         bookId: digitalId,
       });
       openInNewTab(signedUrl);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Gagal membuka buku digital";
-      alert(msg);
+      setActionError(getErrorMessage(e, "Gagal membuka buku digital"));
     } finally {
       setOpeningDigitalId(null);
     }
@@ -280,13 +307,15 @@ export default function BorrowedBooksPage() {
         <div className="flex items-start justify-between gap-6">
           <div>
             <h1 className="text-3xl font-bold text-slate-900">
-              Buku yang Dipinjam
+              Riwayat Peminjaman
             </h1>
             <p className="mt-2 text-slate-600">
               Daftar buku yang sedang atau pernah kamu pinjam.
             </p>
           </div>
         </div>
+
+        <ErrorMessage error={actionError} className="mt-6" />
 
         <section className="mt-8 rounded-2xl border bg-white">
           <div className="px-6 py-5 border-b">
@@ -326,9 +355,8 @@ export default function BorrowedBooksPage() {
           ) : loading ? (
             <div className="px-6 py-12 text-center text-slate-600">Memuat…</div>
           ) : error ? (
-            <div className="px-6 py-12 text-center text-slate-600">
-              <div className="font-semibold text-slate-900">Gagal memuat</div>
-              <div className="mt-2">{error}</div>
+            <div className="px-6 py-6">
+              <ErrorMessage error={error} />
             </div>
           ) : totalItems === 0 ? (
             <div className="px-6 py-12 text-center text-slate-600">
@@ -356,6 +384,9 @@ export default function BorrowedBooksPage() {
                 <tbody className="divide-y">
                   {pageItems.map((item) => {
                     const status = getStatus(item, now);
+                    const perpanjanganLabel = formatPerpanjanganStatus(
+                      item.statusPerpanjangan,
+                    );
                     return (
                       <tr key={item.id} className="hover:bg-slate-50">
                         <td className="px-6 py-4 whitespace-nowrap text-slate-700">
@@ -376,7 +407,26 @@ export default function BorrowedBooksPage() {
                           {item.jatuhTempo ? formatDate(item.jatuhTempo) : "—"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <StatusPill status={status} />
+                          <div className="flex flex-col items-start gap-2">
+                            <StatusPill status={status} />
+                            {perpanjanganLabel ? (
+                              <div className="text-xs text-slate-600">
+                                <span className="font-medium text-slate-900">
+                                  Perpanjangan:
+                                </span>{" "}
+                                {perpanjanganLabel}
+                                {item.akhirPerpanjangan ? (
+                                  <>
+                                    <span className="text-slate-400"> · </span>
+                                    <span>
+                                      hingga{" "}
+                                      {formatDate(item.akhirPerpanjangan)}
+                                    </span>
+                                  </>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {item.digitalId ? (

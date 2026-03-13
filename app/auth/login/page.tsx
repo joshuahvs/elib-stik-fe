@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import InputField from "@/app/components/InputField";
 import PrimaryButton from "@/app/components/PrimaryButton";
+import ErrorMessage, { getErrorMessage } from "@/app/components/ErrorMessage";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,48 +15,53 @@ export default function LoginPage() {
     password: "",
   });
 
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
+    if (error) setError(null);
   };
 
   const handleLogin = async () => {
     if (!form.email.trim() || !form.password.trim()) {
-      alert("Email dan password wajib diisi");
+      setError("Email dan password wajib diisi");
       return;
     }
 
-    const res = await fetch(`${API_URL}/auth/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(form),
-    });
+    try {
+      setIsSubmitting(true);
+      setError(null);
 
-    const data = await res
-      .json()
-      .catch(() => ({ message: "Login failed" }) as { message?: string });
+      const res = await fetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(form),
+      });
 
-    const accessToken =
-      (data as any)?.access_token ??
-      (data as any)?.accessToken ??
-      (data as any)?.token ??
-      (data as any)?.session?.access_token ??
-      (data as any)?.data?.session?.access_token;
+      const data = await res.json().catch(() => null);
 
-    if (res.ok && accessToken) {
-      localStorage.setItem("token", accessToken);
-      alert("Login success!");
-      router.push("/profile");
-      return;
+      const accessToken =
+        (data as any)?.access_token ??
+        (data as any)?.accessToken ??
+        (data as any)?.token ??
+        (data as any)?.session?.access_token ??
+        (data as any)?.data?.session?.access_token;
+
+      if (res.ok && accessToken) {
+        localStorage.setItem("token", accessToken);
+        router.push("/");
+        return;
+      }
+
+      setError(getErrorMessage(data, "Login gagal"));
+    } catch (e) {
+      setError(getErrorMessage(e, "Terjadi kesalahan jaringan. Coba lagi."));
+    } finally {
+      setIsSubmitting(false);
     }
-
-    const message =
-      (data as any)?.message ??
-      (data as any)?.error ??
-      (data as any)?.msg ??
-      "Login failed";
-    alert(message);
   };
 
   return (
@@ -65,6 +71,8 @@ export default function LoginPage() {
           <h1 className="text-2xl md:text-3xl font-bold text-center mb-6 text-slate-900">
             Masuk
           </h1>
+
+          <ErrorMessage error={error} className="mb-4" />
 
           <div className="flex flex-col gap-4">
             <InputField
@@ -91,8 +99,14 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <PrimaryButton onClick={handleLogin} type="button" className="mt-6">
-            Masuk
+          <PrimaryButton
+            onClick={handleLogin}
+            type="button"
+            className="mt-6"
+            disabled={isSubmitting}
+            aria-disabled={isSubmitting}
+          >
+            {isSubmitting ? "Memproses..." : "Masuk"}
           </PrimaryButton>
 
           <p className="text-center mt-4 text-gray-500">
