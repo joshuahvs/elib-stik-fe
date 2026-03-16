@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import ErrorMessage from "@/app/components/ErrorMessage";
 
 function parseHashParams(hash: string): Record<string, string> {
   const clean = hash.startsWith("#") ? hash.slice(1) : hash;
@@ -13,6 +14,31 @@ function parseHashParams(hash: string): Record<string, string> {
 }
 
 export default function AuthCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-white">
+          <main className="mx-auto max-w-xl px-6 py-10">
+            <div className="rounded-2xl bg-white p-8 shadow-xl md:p-10">
+              <h1 className="mb-3 text-center text-2xl font-bold text-slate-900 md:text-3xl">
+                Verifikasi Email
+              </h1>
+              <div className="text-center">
+                <p className="text-slate-700 font-medium">
+                  Memproses verifikasi…
+                </p>
+              </div>
+            </div>
+          </main>
+        </div>
+      }
+    >
+      <AuthCallbackInner />
+    </Suspense>
+  );
+}
+
+function AuthCallbackInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [hashParams, setHashParams] = useState<Record<string, string>>({});
@@ -47,57 +73,56 @@ export default function AuthCallbackPage() {
 
   return (
     <div className="min-h-screen bg-white">
-
       <main className="mx-auto max-w-xl px-6 py-10">
-        <div className="bg-white rounded-2xl shadow-xl p-8 md:p-10">
-          <h1 className="text-2xl md:text-3xl font-bold text-center mb-3 text-slate-900">
+        <div className="rounded-2xl bg-white p-8 shadow-xl md:p-10">
+          <h1 className="mb-3 text-center text-2xl font-bold text-slate-900 md:text-3xl">
             Verifikasi Email
           </h1>
 
           {error ? (
             <div className="text-center">
-              <p className="text-red-700 font-medium">
-                Gagal memverifikasi email
-              </p>
-              <p className="text-slate-600 mt-2 break-words">
-                {errorDescription ||
-                  "Link verifikasi tidak valid atau sudah kedaluwarsa."}
-              </p>
+              <ErrorMessage
+                error={
+                  errorDescription ||
+                  "Link verifikasi tidak valid atau sudah kedaluwarsa."
+                }
+                className="mx-auto max-w-md text-left"
+              />
               <div className="mt-6 flex items-center justify-center gap-3">
                 <Link
                   href="/auth/register"
-                  className="underline text-slate-900"
+                  className="text-slate-900 underline"
                 >
                   Daftar ulang
                 </Link>
                 <span className="text-slate-300">|</span>
-                <Link href="/auth/login" className="underline text-slate-900">
+                <Link href="/auth/login" className="text-slate-900 underline">
                   Kembali ke login
                 </Link>
               </div>
             </div>
           ) : looksSuccessful ? (
             <div className="text-center">
-              <p className="text-green-700 font-medium">
+              <p className="font-medium text-green-700">
                 Email berhasil terverifikasi
               </p>
-              <p className="text-slate-600 mt-2">
+              <p className="mt-2 text-slate-600">
                 Mengarahkan ke halaman login…
               </p>
               <div className="mt-6">
-                <Link href="/auth/login" className="underline text-slate-900">
+                <Link href="/auth/login" className="text-slate-900 underline">
                   Ke halaman login
                 </Link>
               </div>
             </div>
           ) : (
             <div className="text-center">
-              <p className="text-slate-700 font-medium">
+              <p className="font-medium text-slate-700">
                 Memproses verifikasi…
               </p>
-              <p className="text-slate-600 mt-2">
+              <p className="mt-2 text-slate-600">
                 Jika tidak otomatis, klik{" "}
-                <Link href="/auth/login" className="underline text-slate-900">
+                <Link href="/auth/login" className="text-slate-900 underline">
                   di sini
                 </Link>
                 .
