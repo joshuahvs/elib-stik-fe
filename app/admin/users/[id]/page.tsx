@@ -5,7 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import Navbar from "@/app/components/Navbar";
 import PrimaryButton from "@/app/components/PrimaryButton";
 import { fetchAdminUsers } from "@/app/lib/adminUsers";
-import { extendAdminUserMasaAktif, updateAdminUserStatus } from "@/app/lib/adminUserActions";
+import {
+  extendAdminUserMasaAktif,
+  updateAdminUserStatus,
+} from "@/app/lib/adminUserActions";
+import ErrorMessage from "@/app/components/ErrorMessage";
 
 function roleLabel(role: string | null) {
   if (!role) return "-";
@@ -25,7 +29,9 @@ export default function AdminUserDetailPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const [status, setStatus] = useState<"Aktif" | "Nonaktif" | "Deleted">("Aktif");
+  const [status, setStatus] = useState<"Aktif" | "Nonaktif" | "Deleted">(
+    "Aktif",
+  );
   const [years, setYears] = useState<number>(2);
 
   const [message, setMessage] = useState<string | null>(null);
@@ -57,7 +63,9 @@ export default function AdminUserDetailPage() {
   async function handleUpdateStatus() {
     if (!token || !user) return;
 
-    const ok = window.confirm(`Yakin ingin mengubah status akun menjadi ${status}?`);
+    const ok = window.confirm(
+      `Yakin ingin mengubah status akun menjadi ${status}?`,
+    );
     if (!ok) return;
 
     try {
@@ -83,7 +91,9 @@ export default function AdminUserDetailPage() {
   async function handleExtend() {
     if (!token || !user) return;
 
-    const ok = window.confirm(`Yakin ingin memperpanjang masa aktif selama ${years} tahun?`);
+    const ok = window.confirm(
+      `Yakin ingin memperpanjang masa aktif selama ${years} tahun?`,
+    );
     if (!ok) return;
 
     try {
@@ -109,7 +119,6 @@ export default function AdminUserDetailPage() {
 
   return (
     <div className="min-h-screen bg-white">
-
       <main className="mx-auto max-w-5xl px-6 py-10">
         <div className="mb-8 flex items-center justify-between">
           <h1 className="text-2xl font-bold text-slate-900">Edit Pengguna</h1>
@@ -123,38 +132,54 @@ export default function AdminUserDetailPage() {
         </div>
 
         {loading ? (
-          <div className="rounded-2xl border bg-white p-8 text-slate-600">Memuat detail pengguna...</div>
+          <div className="rounded-2xl border bg-white p-8 text-slate-600">
+            Memuat detail pengguna...
+          </div>
         ) : null}
 
         {!loading && !user ? (
-          <div className="rounded-2xl border bg-white p-8 text-slate-600">Pengguna tidak ditemukan.</div>
+          <div className="rounded-2xl border bg-white p-8 text-slate-600">
+            Pengguna tidak ditemukan.
+          </div>
         ) : null}
 
         {!loading && user ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="rounded-2xl border bg-white p-8 shadow-sm">
-              <h2 className="text-xl font-bold text-slate-900 mb-6">Informasi Pengguna</h2>
+              <h2 className="text-xl font-bold text-slate-900 mb-6">
+                Informasi Pengguna
+              </h2>
 
               <div className="space-y-4 text-sm">
                 <div>
                   <p className="text-slate-500">Nama Lengkap</p>
-                  <p className="font-medium text-slate-900">{user.nama_lengkap ?? "-"}</p>
+                  <p className="font-medium text-slate-900">
+                    {user.nama_lengkap ?? "-"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-slate-500">Username</p>
-                  <p className="font-medium text-slate-900">{user.username ?? "-"}</p>
+                  <p className="font-medium text-slate-900">
+                    {user.username ?? "-"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-slate-500">E-mail</p>
-                  <p className="font-medium text-slate-900">{user.email ?? "-"}</p>
+                  <p className="font-medium text-slate-900">
+                    {user.email ?? "-"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-slate-500">Peran</p>
-                  <p className="font-medium text-slate-900">{roleLabel(user.role)}</p>
+                  <p className="font-medium text-slate-900">
+                    {roleLabel(user.role)}
+                  </p>
                 </div>
                 <div>
                   <p className="text-slate-500">Jenjang</p>
-                  <p className="font-medium text-slate-900">{user.jenjang ?? "-"}</p>
+                  <p className="font-medium text-slate-900">
+                    {user.jenjang ?? "-"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-slate-500">Tanggal Batas Aktif</p>
@@ -173,7 +198,9 @@ export default function AdminUserDetailPage() {
             </div>
 
             <div className="rounded-2xl border bg-white p-8 shadow-sm">
-              <h2 className="text-xl font-bold text-slate-900 mb-6">Aksi Admin</h2>
+              <h2 className="text-xl font-bold text-slate-900 mb-6">
+                Aksi Admin
+              </h2>
 
               {message ? (
                 <div className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-green-700">
@@ -181,11 +208,7 @@ export default function AdminUserDetailPage() {
                 </div>
               ) : null}
 
-              {error ? (
-                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
-                  {error}
-                </div>
-              ) : null}
+              {error ? <ErrorMessage error={error} className="mb-4" /> : null}
 
               <div className="space-y-8">
                 <div>
@@ -199,7 +222,8 @@ export default function AdminUserDetailPage() {
                   >
                     <option value="Aktif">Aktif</option>
                     <option value="Nonaktif" disabled={user?.role === "umum"}>
-                        Nonaktif {user?.role === "umum" ? "(hanya mahasiswa)" : ""}
+                      Nonaktif{" "}
+                      {user?.role === "umum" ? "(hanya mahasiswa)" : ""}
                     </option>
                     <option value="Deleted">Deleted</option>
                   </select>

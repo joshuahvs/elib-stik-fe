@@ -1,10 +1,10 @@
-import Navbar from "./components/Navbar";
 import MasaAktifCardClient from "./components/MasaAktifCardClient";
 //Swiper for Articles
 import ArticlesSlider from "./components/ArticlesSlider";
+import { API_URL } from "./lib/api";
 
 async function getLanding() {
-  const res = await fetch("http://localhost:8080/landing", {
+  const res = await fetch(`${API_URL}/landing`, {
     cache: "no-store",
   });
 
@@ -12,7 +12,7 @@ async function getLanding() {
 }
 
 async function getArticles() {
-  const res = await fetch("http://localhost:8080/articles", {
+  const res = await fetch(`${API_URL}/articles`, {
     cache: "no-store",
   });
 
@@ -20,7 +20,7 @@ async function getArticles() {
 }
 
 async function getAnnouncements() {
-  const res = await fetch("http://localhost:8080/announcements", {
+  const res = await fetch(`${API_URL}/announcements`, {
     cache: "no-store",
   });
 

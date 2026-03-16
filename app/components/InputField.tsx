@@ -4,10 +4,12 @@ import * as React from "react";
 
 type InputFieldProps = React.InputHTMLAttributes<HTMLInputElement> & {
   label?: string;
+  labelClassName?: string;
 };
 
 export default function InputField({
   label,
+  labelClassName,
   className,
   id,
   ...props
@@ -19,7 +21,12 @@ export default function InputField({
   return (
     <div className="w-full">
       {label ? (
-        <label htmlFor={inputId} className="block text-sm text-black mb-2">
+        <label
+          htmlFor={inputId}
+          className={["block text-sm mb-2", labelClassName ?? "text-black"]
+            .filter(Boolean)
+            .join(" ")}
+        >
           {label}
         </label>
       ) : null}

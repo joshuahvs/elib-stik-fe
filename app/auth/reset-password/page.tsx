@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Suspense,
   type ChangeEvent,
   type FormEvent,
   useEffect,
@@ -12,6 +13,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { API_URL } from "@/app/lib/api";
 import InputField from "@/app/components/InputField";
 import PrimaryButton from "@/app/components/PrimaryButton";
+import ErrorMessage from "@/app/components/ErrorMessage";
 
 function parseHashParams(hash: string): Record<string, string> {
   const clean = hash.startsWith("#") ? hash.slice(1) : hash;
@@ -24,6 +26,29 @@ function parseHashParams(hash: string): Record<string, string> {
 type Status = "idle" | "submitting" | "success" | "error";
 
 export default function ResetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-white">
+          <main className="mx-auto max-w-xl px-6 py-10">
+            <div className="rounded-2xl bg-white p-8 shadow-xl md:p-10">
+              <h1 className="mb-2 text-center text-2xl font-bold text-slate-900 md:text-3xl">
+                Reset Password
+              </h1>
+              <p className="mb-6 text-center text-sm text-slate-600">
+                Memproses…
+              </p>
+            </div>
+          </main>
+        </div>
+      }
+    >
+      <ResetPasswordInner />
+    </Suspense>
+  );
+}
+
+function ResetPasswordInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -166,7 +191,10 @@ export default function ResetPasswordPage() {
 
           {!isRecoveryLink ? (
             <div className="text-center">
-              <p className="text-red-700 font-medium">Link tidak valid</p>
+              <ErrorMessage
+                error="Link tidak valid"
+                className="mx-auto max-w-md"
+              />
               <p className="text-slate-600 mt-2">
                 Link reset password tidak berisi token yang dibutuhkan.
               </p>
@@ -221,19 +249,21 @@ export default function ResetPasswordPage() {
               />
 
               {message ? (
-                <div
-                  className={[
-                    "text-sm rounded-lg p-3 border",
-                    status === "success"
-                      ? "bg-green-50 border-green-200 text-green-800"
-                      : status === "error"
-                        ? "bg-red-50 border-red-200 text-red-800"
+                status === "error" ? (
+                  <ErrorMessage error={message} />
+                ) : (
+                  <div
+                    className={[
+                      "text-sm rounded-lg p-3 border",
+                      status === "success"
+                        ? "bg-green-50 border-green-200 text-green-800"
                         : "bg-slate-50 border-slate-200 text-slate-700",
-                  ].join(" ")}
-                  role={status === "error" ? "alert" : "status"}
-                >
-                  {message}
-                </div>
+                    ].join(" ")}
+                    role={status === "success" ? "status" : "status"}
+                  >
+                    {message}
+                  </div>
+                )
               ) : null}
 
               <PrimaryButton type="submit" disabled={status === "submitting"}>
@@ -247,7 +277,6 @@ export default function ResetPasswordPage() {
               </p>
             </form>
           )}
-
         </div>
       </main>
     </div>

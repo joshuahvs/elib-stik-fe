@@ -8,6 +8,10 @@ interface DropdownProps {
   options: string[];
   value: string;
   onChange: (value: string) => void;
+  className?: string;
+  labelClassName?: string;
+  valueClassName?: string;
+  buttonClassName?: string;
 }
 
 export default function Dropdown({
@@ -15,6 +19,10 @@ export default function Dropdown({
   options,
   value,
   onChange,
+  className,
+  labelClassName,
+  valueClassName,
+  buttonClassName,
 }: DropdownProps) {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -35,28 +43,44 @@ export default function Dropdown({
   }, []);
 
   return (
-    <div className="relative w-full" ref={dropdownRef}>
+    <div
+      className={["relative w-full", className].filter(Boolean).join(" ")}
+      ref={dropdownRef}
+    >
       {/* Label */}
-      <label className="block text-sm text-black mb-2">
+      <label
+        className={["block text-sm mb-2", labelClassName ?? "text-black"]
+          .filter(Boolean)
+          .join(" ")}
+      >
         {label}
       </label>
 
       {/* Input box */}
       <div
         onClick={() => setOpen(!open)}
-        className={`flex items-center justify-between px-4 py-3 rounded-xl border cursor-pointer transition-all duration-200
-        ${
+        className={[
+          "flex items-center justify-between px-4 py-3 rounded-xl border cursor-pointer transition-all duration-200",
           open
             ? "border-[#733015] ring-2 ring-[#733015]/20"
-            : "border-gray-300"
-        }`}
+            : "border-gray-300",
+          buttonClassName,
+        ]
+          .filter(Boolean)
+          .join(" ")}
       >
-        <span className="text-gray-800">{value}</span>
+        <span
+          className={["text-gray-800", valueClassName]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          {value}
+        </span>
 
         {open ? (
-          <ChevronUp size={20} color="black"/>
+          <ChevronUp size={20} color="black" />
         ) : (
-          <ChevronDown size={20} color="black"/>
+          <ChevronDown size={20} color="black" />
         )}
       </div>
 

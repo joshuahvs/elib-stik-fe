@@ -8,6 +8,7 @@ import {
   fetchAdminPeminjamanBuku,
   updatePeminjamanBukuByAdmin,
 } from "@/app/lib/peminjamanBuku";
+import ErrorMessage, { getErrorMessage } from "@/app/components/ErrorMessage";
 
 function getRole(me: any): string | undefined {
   return me?.role ?? me?.data?.role ?? me?.user?.role ?? undefined;
@@ -127,6 +128,7 @@ export default function AdminBorrowedBookRequestsPage() {
   const [tanggalPinjam, setTanggalPinjam] = useState<string>("");
   const [periodeHari, setPeriodeHari] = useState<number>(7);
   const [submitting, setSubmitting] = useState(false);
+  const [approveError, setApproveError] = useState<string | null>(null);
 
   useEffect(() => {
     const t = localStorage.getItem("token");
@@ -207,6 +209,7 @@ export default function AdminBorrowedBookRequestsPage() {
 
   function openApproveModal(row: AdminLoanRow) {
     setApproveId(row.id);
+    setApproveError(null);
 
     const initialTanggal = row.tanggal_peminjaman || toIsoDate(new Date());
     setTanggalPinjam(initialTanggal);
@@ -221,6 +224,7 @@ export default function AdminBorrowedBookRequestsPage() {
 
     try {
       setSubmitting(true);
+      setApproveError(null);
       await updatePeminjamanBukuByAdmin({
         token,
         id: approveId,
@@ -244,7 +248,7 @@ export default function AdminBorrowedBookRequestsPage() {
       setApproveOpen(false);
       setApproveId(null);
     } catch (e: any) {
-      alert(e?.message ?? "Gagal menyetujui peminjaman");
+      setApproveError(getErrorMessage(e, "Gagal menyetujui peminjaman"));
     } finally {
       setSubmitting(false);
     }
@@ -254,7 +258,6 @@ export default function AdminBorrowedBookRequestsPage() {
 
   return (
     <div className="min-h-screen bg-white">
-
       <main className="mx-auto max-w-6xl px-6 py-10">
         <div className="flex items-start justify-between gap-6">
           <div>
@@ -321,9 +324,8 @@ export default function AdminBorrowedBookRequestsPage() {
             </div>
 
             {error && !isLoading ? (
-              <div className="px-6 py-12 text-center text-slate-600">
-                <div className="font-semibold text-slate-900">Gagal memuat</div>
-                <div className="mt-2">{error}</div>
+              <div className="px-6 py-6">
+                <ErrorMessage error={error} />
               </div>
             ) : null}
 
@@ -476,6 +478,8 @@ export default function AdminBorrowedBookRequestsPage() {
               <div className="text-lg font-semibold text-slate-900">
                 Setujui Peminjaman
               </div>
+
+              <ErrorMessage error={approveError} className="mt-4" />
 
               <div className="mt-4 grid gap-4">
                 <div>

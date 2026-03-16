@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import PrimaryButton from "@/app/components/PrimaryButton";
 import { API_URL } from "@/app/lib/api";
 import Navbar from "@/app/components/Navbar";
+import ErrorMessage, { getErrorMessage } from "@/app/components/ErrorMessage";
 
 export default function LogoutConfirmPage() {
   const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setToken(localStorage.getItem("token"));
@@ -18,7 +20,7 @@ export default function LogoutConfirmPage() {
   const isLoggedIn = useMemo(() => Boolean(token), [token]);
 
   const handleCancel = () => {
-    router.push("/profile")
+    router.push("/profile");
   };
 
   const handleSignOut = async () => {
@@ -29,6 +31,7 @@ export default function LogoutConfirmPage() {
 
     try {
       setIsSubmitting(true);
+      setError(null);
 
       const res = await fetch(`${API_URL}/auth/logout`, {
         method: "POST",
@@ -39,16 +42,16 @@ export default function LogoutConfirmPage() {
 
       const data = await res.json().catch(() => ({}));
 
-      localStorage.removeItem("token");
-
       if (!res.ok) {
-        const msg = (data as any)?.message ?? "Gagal Keluar";
-        alert(msg);
-        router.replace("/auth/login");
+        // Still clear local token (user is effectively logged out on FE)
+        localStorage.removeItem("token");
+        setToken(null);
+        setError(getErrorMessage(data, "Gagal keluar"));
         return;
       }
 
-      alert("Berhasil Keluar.");
+      localStorage.removeItem("token");
+      setToken(null);
       router.replace("/auth/login");
       router.refresh();
     } finally {
@@ -58,41 +61,43 @@ export default function LogoutConfirmPage() {
 
   return (
     <div className="relative min-h-screen">
-        {/* Background image */}
-        <div
+      {/* Background image */}
+      <div
         className="absolute inset-0 bg-cover bg-center"
         style={{ backgroundImage: "url('/bg-2.png')" }}
-        />
-        
-        {/* Content */}
-        <div className="relative z-10 min-h-screen flex items-center justify-center px-6">
-        <div className="w-full max-w-xl rounded-3xl bg-white/85 backdrop-blur-md shadow-2xl p-10 text-center">
-            <h1 className="text-3xl font-extrabold text-slate-900">
-            Keluar dari akun Anda?
-            </h1>
-            <p className="mt-3 text-slate-700">
-            Anda perlu masuk kembali untuk melanjutkan.
-            </p>
+      />
 
-            <div className="mt-8 flex flex-col gap-4">
+      {/* Content */}
+      <div className="relative z-10 min-h-screen flex items-center justify-center px-6">
+        <div className="w-full max-w-xl rounded-3xl bg-white/85 backdrop-blur-md shadow-2xl p-10 text-center">
+          <h1 className="text-3xl font-extrabold text-slate-900">
+            Keluar dari akun Anda?
+          </h1>
+          <p className="mt-3 text-slate-700">
+            Anda perlu masuk kembali untuk melanjutkan.
+          </p>
+
+          <ErrorMessage error={error} className="mt-6 text-left" />
+
+          <div className="mt-8 flex flex-col gap-4">
             <button
-                onClick={handleCancel}
-                disabled={isSubmitting}
-                className="h-12 w-full rounded-xl border border-slate-300 bg-white font-medium text-slate-900 hover:bg-slate-50 disabled:opacity-60"
+              onClick={handleCancel}
+              disabled={isSubmitting}
+              className="h-12 w-full rounded-xl border border-slate-300 bg-white font-medium text-slate-900 hover:bg-slate-50 disabled:opacity-60"
             >
-                Kembali
+              Kembali
             </button>
 
             <PrimaryButton
-                onClick={handleSignOut}
-                type="button"
-                disabled={isSubmitting}
+              onClick={handleSignOut}
+              type="button"
+              disabled={isSubmitting}
             >
-                {isSubmitting ? "Sedang keluar..." : "Keluar"}
+              {isSubmitting ? "Sedang keluar..." : "Keluar"}
             </PrimaryButton>
-            </div>
+          </div>
         </div>
-        </div>
+      </div>
     </div>
-    );
+  );
 }

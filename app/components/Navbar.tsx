@@ -23,11 +23,6 @@ function getRole(me: any): string | undefined {
 function getDisplayName(me: any): string | undefined {
   const raw =
     me?.nama_lengkap ??
-    me?.data?.nama_lengkap ??
-    me?.user?.nama_lengkap ??
-    me?.username ??
-    me?.data?.username ??
-    me?.user?.username ??
     undefined;
 
   if (typeof raw !== "string") return undefined;
@@ -248,14 +243,14 @@ export default function Navbar({ items }: NavbarProps) {
                       className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
                       onClick={() => setAdminOpen(false)}
                     >
-                      Login Logs
+                      Riwayat Login Pengguna
                     </Link>
                     <Link
                       href="/admin/users"
                       className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
                       onClick={() => setAdminOpen(false)}
                     >
-                      Users
+                      Daftar Pengguna
                     </Link>
                     <Link
                       href="/admin/borrowed-book-requests"
