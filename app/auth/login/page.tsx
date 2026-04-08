@@ -65,56 +65,68 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      <main className="mx-auto max-w-xl px-6 py-10">
-        <div className="bg-white rounded-2xl shadow-xl p-8 md:p-10">
-          <h1 className="text-2xl md:text-3xl font-bold text-center mb-6 text-slate-900">
-            Masuk
-          </h1>
+    <div className="min-h-screen">
+      <main className="relative min-h-screen">
+        <div className="absolute inset-0 bg-[url('/bg-3.png')] bg-cover bg-center" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/55 to-black/10" />
 
-          <ErrorMessage error={error} className="mb-4" />
+        <div className="relative min-h-screen grid grid-cols-1 md:grid-cols-2">
+          <section className="hidden md:block" aria-hidden="true" />
 
-          <div className="flex flex-col gap-4">
-            <InputField
-              name="email"
-              type="email"
-              placeholder="Email"
-              onChange={handleChange}
-            />
+          <section className="min-h-screen flex items-center justify-center px-6 py-10 pt-24">
+            <div className="w-full max-w-md">
+              <h1 className="text-3xl md:text-4xl font-bold text-white mb-6">
+                Masuk
+              </h1>
 
-            <InputField
-              name="password"
-              type="password"
-              placeholder="Password"
-              onChange={handleChange}
-            />
+              <ErrorMessage error={error} className="mb-4" />
 
-            <div className="text-right">
-              <Link
-                href="/auth/forgot-password"
-                className="text-sm text-slate-600 hover:text-slate-900 underline"
+              <div className="flex flex-col gap-4">
+                <InputField
+                  name="email"
+                  type="email"
+                  placeholder="E-mail"
+                  onChange={handleChange}
+                />
+
+                <InputField
+                  name="password"
+                  type="password"
+                  placeholder="Password"
+                  onChange={handleChange}
+                />
+
+                <div className="text-left">
+                  <Link
+                    href="/auth/forgot-password"
+                    className="text-sm text-white/80 hover:text-white underline"
+                  >
+                    Lupa Kata Sandi?
+                  </Link>
+                </div>
+              </div>
+
+              <PrimaryButton
+                onClick={handleLogin}
+                type="button"
+                className="mt-6 bg-black bg-none"
+                disabled={isSubmitting}
+                aria-disabled={isSubmitting}
               >
-                Lupa password?
-              </Link>
+                {isSubmitting ? "Memproses..." : "Masuk"}
+              </PrimaryButton>
+
+              <p className="text-center mt-4 text-white/80">
+                Tidak punya akun?{" "}
+                <Link
+                  href="/auth/register"
+                  className="underline hover:text-white"
+                >
+                  Buat akun.
+                </Link>
+              </p>
             </div>
-          </div>
-
-          <PrimaryButton
-            onClick={handleLogin}
-            type="button"
-            className="mt-6"
-            disabled={isSubmitting}
-            aria-disabled={isSubmitting}
-          >
-            {isSubmitting ? "Memproses..." : "Masuk"}
-          </PrimaryButton>
-
-          <p className="text-center mt-4 text-gray-500">
-            Belum punya akun?{" "}
-            <Link href="/auth/register" className="underline">
-              Daftar
-            </Link>
-          </p>
+          </section>
         </div>
       </main>
     </div>
