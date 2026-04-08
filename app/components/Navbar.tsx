@@ -21,9 +21,7 @@ function getRole(me: any): string | undefined {
 }
 
 function getDisplayName(me: any): string | undefined {
-  const raw =
-    me?.nama_lengkap ??
-    undefined;
+  const raw = me?.nama_lengkap ?? undefined;
 
   if (typeof raw !== "string") return undefined;
   const trimmed = raw.trim();
@@ -32,6 +30,9 @@ function getDisplayName(me: any): string | undefined {
 
 export default function Navbar({ items }: NavbarProps) {
   const pathname = usePathname();
+
+  const isLoginPage = pathname === "/auth/login";
+  const isRegisterPage = pathname === "/auth/register";
 
   const [adminOpen, setAdminOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
@@ -172,19 +173,52 @@ export default function Navbar({ items }: NavbarProps) {
   }, [items, pathname]);
 
   return (
-    <header className="w-full bg-white border-b">
+    <header
+      className={[
+        "w-full",
+        isLoginPage || isRegisterPage
+          ? "absolute top-0 left-0 z-50 bg-transparent border-b border-transparent"
+          : "bg-white border-b",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
       <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
-        <div className="text-lg font-semibold text-slate-900">eLib</div>
+        <div
+          className={[
+            "text-lg font-semibold",
+            isLoginPage || isRegisterPage ? "text-white" : "text-slate-900",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          eLib
+        </div>
 
-        <nav className="flex items-center gap-8 text-sm text-slate-700">
+        <nav
+          className={[
+            "flex items-center gap-8 text-sm",
+            isLoginPage || isRegisterPage ? "text-white/90" : "text-slate-700",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
           {navItems.map((item) => {
             const isActive = item.href !== "#" && pathname === item.href;
             const className = [
               "transition-colors",
               item.disabled
-                ? "text-slate-400 cursor-not-allowed"
-                : "hover:text-slate-900",
-              isActive ? "text-slate-900 font-semibold" : "",
+                ? isLoginPage || isRegisterPage
+                  ? "text-white/40 cursor-not-allowed"
+                  : "text-slate-400 cursor-not-allowed"
+                : isLoginPage || isRegisterPage
+                  ? "hover:text-white"
+                  : "hover:text-slate-900",
+              isActive
+                ? isLoginPage || isRegisterPage
+                  ? "text-white font-semibold"
+                  : "text-slate-900 font-semibold"
+                : "",
             ]
               .filter(Boolean)
               .join(" ");
@@ -246,6 +280,13 @@ export default function Navbar({ items }: NavbarProps) {
                       Riwayat Login Pengguna
                     </Link>
                     <Link
+                      href="/admin/landing-content"
+                      className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                      onClick={() => setAdminOpen(false)}
+                    >
+                      Konten Landing Page
+                    </Link>
+                    <Link
                       href="/admin/users"
                       className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
                       onClick={() => setAdminOpen(false)}
@@ -268,7 +309,12 @@ export default function Navbar({ items }: NavbarProps) {
           {!isAuthed ? (
             <Link
               href="/auth/login"
-              className="transition-colors hover:text-slate-900"
+              className={[
+                "transition-colors",
+                isLoginPage ? "hover:text-white" : "hover:text-slate-900",
+              ]
+                .filter(Boolean)
+                .join(" ")}
             >
               Masuk
             </Link>
