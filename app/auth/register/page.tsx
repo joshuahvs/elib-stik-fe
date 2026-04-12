@@ -7,6 +7,7 @@ import Dropdown from "@/app/components/DropDown";
 import InputField from "@/app/components/InputField";
 import PrimaryButton from "@/app/components/PrimaryButton";
 import ErrorMessage, { getErrorMessage } from "@/app/components/ErrorMessage";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function RegisterPage() {
   const roleOptions = useMemo(
@@ -33,6 +34,7 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const selectedRoleLabel =
     roleOptions.find((o) => o.value === role)?.label ?? role;
@@ -250,6 +252,26 @@ export default function RegisterPage() {
                   value={form.password}
                   required
                 />
+                <div className="relative">
+                  <InputField
+                    label="Kata Sandi *"
+                    labelClassName="text-white/80"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Kata Sandi"
+                    onChange={handleChange}
+                    value={form.password}
+                    required
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-[65%] -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  >
+                    {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
+                  </button>
+                </div>
 
                 <div className="text-xs text-white/80 rounded-xl bg-black/35 border border-white/10 p-3">
                   <p className="mb-1">Password harus terdiri dari:</p>
