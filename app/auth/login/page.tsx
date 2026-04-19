@@ -91,12 +91,6 @@ export default function LoginPage() {
                   onChange={handleChange}
                 />
 
-                <InputField
-                  name="password"
-                  type="password"
-                  placeholder="Password"
-                  onChange={handleChange}
-                />
                 <div className="relative">
                   <InputField
                     name="password"
