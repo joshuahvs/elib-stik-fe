@@ -242,3 +242,53 @@ export async function ajukanPeminjamanBuku(opts: {
 
   return data;
 }
+
+export async function ajukanPerpanjanganPeminjaman(opts: {
+  token: string;
+  loanId: string;
+  durasiHari: number;
+}): Promise<any> {
+  const durasiHari = Math.max(1, Math.min(30, Math.trunc(opts.durasiHari)));
+
+  const candidates = [
+    `${API_URL}/peminjaman-buku/${encodeURIComponent(opts.loanId)}/perpanjangan`,
+    `${API_URL}/peminjaman/${encodeURIComponent(opts.loanId)}/perpanjangan`,
+  ];
+
+  let lastError: Error | null = null;
+
+  for (const url of candidates) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${opts.token}`,
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ durasiHari }),
+      });
+
+      const { data, textBody } = await parseJsonOrText(res);
+
+      if (!res.ok) {
+        const msg = pickErrorMessage(
+          data,
+          textBody,
+          "Gagal mengajukan perpanjangan",
+        );
+        lastError = new Error(`${res.status} ${res.statusText}: ${msg}`);
+        continue;
+      }
+
+      return data;
+    } catch (e) {
+      lastError =
+        e instanceof Error
+          ? e
+          : new Error("Gagal mengajukan perpanjangan");
+    }
+  }
+
+  throw lastError ?? new Error("Gagal mengajukan perpanjangan");
+}
