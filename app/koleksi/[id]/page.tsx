@@ -46,7 +46,8 @@ export default function KoleksiDetailPage() {
   const [pageError, setPageError] = useState<string | null>(null);
 
   const [submittingLoan, setSubmittingLoan] = useState(false);
-  const [loanError, setLoanError] = useState<string | null>(null);
+  const [loanPageError, setLoanPageError] = useState<string | null>(null);
+  const [loanModalError, setLoanModalError] = useState<string | null>(null);
   const [loanSuccess, setLoanSuccess] = useState<string | null>(null);
   const [loanModalOpen, setLoanModalOpen] = useState(false);
   const [tanggalPinjam, setTanggalPinjam] = useState<string>("");
@@ -178,7 +179,7 @@ export default function KoleksiDetailPage() {
       return;
     }
     if (!numericBukuId) {
-      setLoanError("ID buku tidak valid untuk pengajuan peminjaman.");
+      setLoanPageError("ID buku tidak valid untuk pengajuan peminjaman.");
       setLoanSuccess(null);
       return;
     }
@@ -190,7 +191,8 @@ export default function KoleksiDetailPage() {
       setPeriodeHari(7);
     }
 
-    setLoanError(null);
+    setLoanPageError(null);
+    setLoanModalError(null);
     setLoanSuccess(null);
     setLoanModalOpen(true);
   }
@@ -203,27 +205,29 @@ export default function KoleksiDetailPage() {
     }
 
     if (!numericBukuId) {
-      setLoanError("ID buku tidak valid untuk pengajuan peminjaman.");
+      setLoanModalError("ID buku tidak valid untuk pengajuan peminjaman.");
       setLoanSuccess(null);
       return;
     }
 
     if (!tanggalPinjam || !akhirPinjam) {
-      setLoanError("Silakan pilih tanggal peminjaman dan periode peminjaman.");
+      setLoanModalError(
+        "Silakan pilih tanggal peminjaman dan periode peminjaman.",
+      );
       setLoanSuccess(null);
       return;
     }
 
     const currentTodayYmd = formatLocalYmd(new Date());
     if (tanggalPinjam < currentTodayYmd) {
-      setLoanError("Tanggal peminjaman tidak boleh di masa lalu.");
+      setLoanModalError("Tanggal peminjaman tidak boleh di masa lalu.");
       setLoanSuccess(null);
       return;
     }
 
     try {
       setSubmittingLoan(true);
-      setLoanError(null);
+      setLoanModalError(null);
       setLoanSuccess(null);
       await ajukanPeminjamanBuku({
         token: t,
@@ -234,7 +238,7 @@ export default function KoleksiDetailPage() {
       setLoanSuccess("Pengajuan peminjaman berhasil dikirim.");
       setLoanModalOpen(false);
     } catch (e) {
-      setLoanError(getErrorMessage(e, "Gagal mengajukan peminjaman"));
+      setLoanModalError(getErrorMessage(e, "Gagal mengajukan peminjaman"));
     } finally {
       setSubmittingLoan(false);
     }
@@ -286,7 +290,9 @@ export default function KoleksiDetailPage() {
         </button>
 
         <ErrorMessage error={pageError} className="mb-6" />
-        <ErrorMessage error={loanError} className="mb-6" />
+        {!loanModalOpen ? (
+          <ErrorMessage error={loanPageError} className="mb-6" />
+        ) : null}
         {loanSuccess ? (
           <div className="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
             {loanSuccess}
@@ -545,6 +551,8 @@ export default function KoleksiDetailPage() {
                 Ajukan Peminjaman
               </div>
 
+              <ErrorMessage error={loanModalError} className="mt-4" />
+
               <div className="mt-4 grid gap-4">
                 <div>
                   <label className="mb-2 block text-sm text-slate-700">
@@ -558,12 +566,12 @@ export default function KoleksiDetailPage() {
                       const next = e.target.value;
                       setTanggalPinjam(next);
                       if (next && next < todayYmd) {
-                        setLoanError(
+                        setLoanModalError(
                           "Tanggal peminjaman tidak boleh di masa lalu.",
                         );
                         setLoanSuccess(null);
-                      } else if (loanError) {
-                        setLoanError(null);
+                      } else if (loanModalError) {
+                        setLoanModalError(null);
                       }
                     }}
                     className="h-11 w-full rounded-xl border border-slate-300 px-3 text-black"
