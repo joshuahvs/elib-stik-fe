@@ -242,16 +242,6 @@ export default function RegisterPage() {
                   />
                 )}
 
-                <InputField
-                  label="Kata Sandi *"
-                  labelClassName="text-white/80"
-                  name="password"
-                  type="password"
-                  placeholder="Kata Sandi"
-                  onChange={handleChange}
-                  value={form.password}
-                  required
-                />
                 <div className="relative">
                   <InputField
                     label="Kata Sandi *"
