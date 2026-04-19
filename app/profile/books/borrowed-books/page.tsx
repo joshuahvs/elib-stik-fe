@@ -576,8 +576,8 @@ export default function BorrowedBooksPage() {
 
         <ErrorMessage error={actionError} className="mt-6" />
 
-        <section className="mt-8 rounded-2xl border bg-white">
-          <div className="px-6 py-5 border-b">
+        <section className="mt-8 rounded-2xl border border-slate-200 bg-white">
+          <div className="border-b border-slate-200 px-6 py-5">
             <div className="text-sm text-slate-600">
               {loading ? (
                 "Memuat data pinjaman…"
@@ -623,10 +623,18 @@ export default function BorrowedBooksPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
+              <table className="w-full min-w-full table-fixed text-sm">
+                <colgroup>
+                  <col className="w-32" />
+                  <col />
+                  <col className="w-36" />
+                  <col className="w-36" />
+                  <col className="w-52" />
+                  <col className="w-52" />
+                </colgroup>
                 <thead className="bg-slate-50 text-slate-700">
                   <tr>
-                    <th className="text-left font-semibold px-6 py-3">
+                    <th className="px-6 py-3 text-left font-semibold whitespace-nowrap">
                       Peminjaman #
                     </th>
                     <th className="text-left font-semibold px-6 py-3">Buku</th>
@@ -639,28 +647,48 @@ export default function BorrowedBooksPage() {
                     <th className="text-left font-semibold px-6 py-3">
                       Status
                     </th>
-                    <th className="text-left font-semibold px-6 py-3">Aksi</th>
+                    <th className="px-6 py-3 text-right font-semibold">Aksi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y divide-slate-200">
                   {pageItems.map((item, idx) => {
                     const status = getStatus(item, now);
                     const perpanjanganLabel = formatPerpanjanganStatus(
                       item.statusPerpanjangan,
                     );
 
+                    const isReturned =
+                      status === "Dikembalikan" || Boolean(item.tanggalKembali);
+
                     const until = daysUntilDue(item.jatuhTempo, now);
+
+                    const dueAt = item.jatuhTempo
+                      ? new Date(`${item.jatuhTempo}T23:59:59`)
+                      : null;
+                    const isPastDue =
+                      !isReturned &&
+                      dueAt != null &&
+                      !Number.isNaN(dueAt.getTime()) &&
+                      now > dueAt;
+
                     const isSoon =
+                      !isPastDue &&
                       until != null &&
                       until >= 0 &&
                       until <= 3 &&
                       !item.tanggalKembali;
+
+                    const isActiveLoan =
+                      status === "Dipinjam" ||
+                      status === "Terlambat" ||
+                      status === "Disetujui";
+
                     const canRequestExtension =
                       !item.digitalId &&
-                      (status === "Dipinjam" || status === "Terlambat") &&
+                      isActiveLoan &&
+                      !isPastDue &&
                       (perpanjanganLabel == null ||
-                        perpanjanganLabel === "Ditolak") &&
-                      (status === "Terlambat" || isSoon);
+                        perpanjanganLabel === "Ditolak");
 
                     return (
                       <tr key={item.id} className="hover:bg-slate-50">
@@ -693,11 +721,11 @@ export default function BorrowedBooksPage() {
                             ) : null}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4 align-top">
                           <div className="flex flex-col items-start gap-2">
                             <StatusPill status={status} />
                             {perpanjanganLabel ? (
-                              <div className="text-xs text-slate-600">
+                              <div className="text-xs text-slate-600 whitespace-normal break-words">
                                 <span className="font-medium text-slate-900">
                                   Perpanjangan:
                                 </span>{" "}
@@ -715,36 +743,48 @@ export default function BorrowedBooksPage() {
                             ) : null}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {item.digitalId ? (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenDigital(item.digitalId!)}
-                              disabled={openingDigitalId === item.digitalId}
-                              className={
-                                "inline-flex h-9 items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                              }
-                            >
-                              {openingDigitalId === item.digitalId
-                                ? "Membuka…"
-                                : "Baca Digital"}
-                            </button>
-                          ) : canRequestExtension ? (
-                            <button
-                              type="button"
-                              onClick={() => openPerpanjangan(item)}
-                              className={[
-                                "inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-medium text-white",
-                                "bg-gradient-to-r from-[#733015] to-[#8b5529]",
-                                "hover:opacity-95",
-                              ].join(" ")}
-                            >
-                              <Calendar className="h-4 w-4" />
-                              Perpanjang
-                            </button>
-                          ) : (
-                            <span className="text-slate-400">—</span>
-                          )}
+                        <td className="px-6 py-4 align-top">
+                          <div className="flex justify-end">
+                            {item.digitalId ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleOpenDigital(item.digitalId!)
+                                }
+                                disabled={openingDigitalId === item.digitalId}
+                                className={
+                                  "inline-flex h-9 items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                }
+                              >
+                                {openingDigitalId === item.digitalId
+                                  ? "Membuka…"
+                                  : "Baca Digital"}
+                              </button>
+                            ) : isPastDue ? (
+                              <div className="inline-flex max-w-full items-start gap-1.5 whitespace-normal text-xs text-rose-700">
+                                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                                <span>
+                                  Sudah jatuh tempo. Akan kena denda jika tidak
+                                  segera mengembalikan.
+                                </span>
+                              </div>
+                            ) : canRequestExtension ? (
+                              <button
+                                type="button"
+                                onClick={() => openPerpanjangan(item)}
+                                className={[
+                                  "inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-medium text-white",
+                                  "bg-gradient-to-r from-[#733015] to-[#8b5529]",
+                                  "hover:opacity-95",
+                                ].join(" ")}
+                              >
+                                <Calendar className="h-4 w-4" />
+                                Perpanjang
+                              </button>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -755,7 +795,7 @@ export default function BorrowedBooksPage() {
           )}
 
           {totalItems > 0 && !loading && !error && token ? (
-            <div className="px-6 py-5 border-t flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex flex-col gap-4 border-t border-slate-200 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm text-slate-600">
                 Halaman{" "}
                 <span className="font-semibold text-slate-900">{page}</span>{" "}

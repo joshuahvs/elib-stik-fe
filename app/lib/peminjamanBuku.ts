@@ -252,7 +252,6 @@ export async function ajukanPerpanjanganPeminjaman(opts: {
 
   const candidates = [
     `${API_URL}/peminjaman-buku/${encodeURIComponent(opts.loanId)}/perpanjangan`,
-    `${API_URL}/peminjaman/${encodeURIComponent(opts.loanId)}/perpanjangan`,
   ];
 
   let lastError: Error | null = null;
