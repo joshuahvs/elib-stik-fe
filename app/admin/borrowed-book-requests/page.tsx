@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import Navbar from "@/app/components/Navbar";
 import { API_URL } from "@/app/lib/api";
+import { fetchAdminUsers } from "@/app/lib/adminUsers";
 import {
   fetchAdminPeminjamanBuku,
   updatePeminjamanBukuByAdmin,
@@ -64,13 +64,22 @@ function pickFirstString(obj: any, keys: string[]): string | undefined {
   return undefined;
 }
 
+function isLikelyUuid(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  const s = value.trim();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    s,
+  );
+}
+
 type AdminLoanRow = {
   id: string;
   status: string;
   tanggal_peminjaman?: string;
   akhir_peminjaman?: string;
   bukuJudul: string;
-  userLabel: string;
+  userId: string | null;
+  userName: string | null;
 };
 
 function mapAdminLoan(row: any): AdminLoanRow {
@@ -94,10 +103,40 @@ function mapAdminLoan(row: any): AdminLoanRow {
     pickFirstString(row, ["judul", "title"]) ??
     "(Tanpa judul)";
 
-  const userLabel =
-    pickFirstString(user, ["nama_lengkap", "namaLengkap", "name", "email"]) ??
-    pickFirstString(row, ["user_email", "email"]) ??
-    String(row?.userId ?? row?.user_id ?? "-");
+  const userId =
+    pickFirstString(user, ["id", "userId", "user_id"]) ??
+    pickFirstString(row, [
+      "userId",
+      "user_id",
+      "peminjamId",
+      "peminjam_id",
+      "borrowerId",
+      "borrower_id",
+    ]) ??
+    (typeof row?.user === "string" ? row.user : undefined) ??
+    (typeof row?.peminjam === "string" ? row.peminjam : undefined) ??
+    null;
+
+  const userName =
+    pickFirstString(user, [
+      "nama_lengkap",
+      "namaLengkap",
+      "full_name",
+      "fullName",
+      "name",
+      "username",
+      "email",
+    ]) ??
+    pickFirstString(row, [
+      "nama_lengkap",
+      "namaLengkap",
+      "user_name",
+      "user_username",
+      "username",
+      "user_email",
+      "email",
+    ]) ??
+    null;
 
   return {
     id,
@@ -105,7 +144,8 @@ function mapAdminLoan(row: any): AdminLoanRow {
     tanggal_peminjaman,
     akhir_peminjaman,
     bukuJudul,
-    userLabel,
+    userId,
+    userName,
   };
 }
 
@@ -118,6 +158,8 @@ export default function AdminBorrowedBookRequestsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [rows, setRows] = useState<AdminLoanRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  const [userNameById, setUserNameById] = useState<Record<string, string>>({});
 
   const [page, setPage] = useState(1);
   const limit = 10;
@@ -184,6 +226,40 @@ export default function AdminBorrowedBookRequestsPage() {
     load(page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meLoading, token, isAdmin, page]);
+
+  useEffect(() => {
+    if (meLoading) return;
+    if (!token) return;
+    if (!isAdmin) return;
+
+    let cancelled = false;
+
+    // Fetch user list once so we can render names instead of UUIDs.
+    fetchAdminUsers({ token, limit: 500 })
+      .then((res) => {
+        if (cancelled) return;
+        const map: Record<string, string> = {};
+        for (const u of res.data ?? []) {
+          const label =
+            typeof u.nama_lengkap === "string" && u.nama_lengkap.trim()
+              ? u.nama_lengkap.trim()
+              : typeof u.username === "string" && u.username.trim()
+                ? u.username.trim()
+                : typeof u.email === "string" && u.email.trim()
+                  ? u.email.trim()
+                  : "";
+          if (label) map[u.id] = label;
+        }
+        setUserNameById(map);
+      })
+      .catch(() => {
+        // Ignore; we'll fall back to any name/email found on the loan row.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [meLoading, token, isAdmin]);
 
   const totalPages = useMemo(() => {
     if (typeof total === "number") return Math.max(1, Math.ceil(total / limit));
@@ -344,7 +420,7 @@ export default function AdminBorrowedBookRequestsPage() {
                     <tr>
                       <th className="text-left font-semibold px-6 py-3">ID</th>
                       <th className="text-left font-semibold px-6 py-3">
-                        User
+                        Peminjam
                       </th>
                       <th className="text-left font-semibold px-6 py-3">
                         Buku
@@ -367,13 +443,22 @@ export default function AdminBorrowedBookRequestsPage() {
                     {rows.map((r) => {
                       const isPending =
                         String(r.status).toUpperCase() === "DIAJUKAN";
+
+                      const resolvedUser =
+                        (r.userId ? userNameById[r.userId] : undefined) ??
+                        r.userName ??
+                        "-";
+                      const safeUser =
+                        isLikelyUuid(resolvedUser) || !resolvedUser.trim()
+                          ? "-"
+                          : resolvedUser;
                       return (
                         <tr key={r.id} className="hover:bg-slate-50">
                           <td className="px-6 py-4 whitespace-nowrap text-slate-700">
                             {r.id}
                           </td>
                           <td className="px-6 py-4 text-slate-700">
-                            {r.userLabel}
+                            {safeUser}
                           </td>
                           <td className="px-6 py-4">
                             <div className="font-semibold text-slate-900">
