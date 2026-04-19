@@ -20,6 +20,7 @@ type BorrowStatus =
 
 type BorrowedBook = {
   id: string;
+  bukuId?: string;
   judul: string;
   penulis: string;
   tanggalPinjam: string;
@@ -43,12 +44,21 @@ function toIsoDate(value: any): string {
   if (typeof value === "string") {
     // Common shapes: 'YYYY-MM-DD' or ISO timestamp.
     const s = value.trim();
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const lead = /^(\d{4}-\d{2}-\d{2})/.exec(s);
+    if (lead) return lead[1];
     const d = new Date(s);
-    if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    if (!Number.isNaN(d.getTime())) {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    }
   }
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toISOString().slice(0, 10);
+    const yyyy = value.getFullYear();
+    const mm = String(value.getMonth() + 1).padStart(2, "0");
+    const dd = String(value.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
   }
   return "";
 }
@@ -78,14 +88,26 @@ function mapLoanToBorrowedBook(row: any): BorrowedBook {
     row?.akhir_peminjaman ?? row?.jatuhTempo ?? row?.end_date,
   );
 
-  const tanggalKembali =
+  let tanggalKembali =
     toIsoDate(
       row?.tanggal_pengembalian ?? row?.tanggalKembali ?? row?.returned_at,
-    ) || undefined;
+    ) || "";
 
-  const bukuId = row?.bukuId ?? buku?.id ?? buku?.bukuId;
+  const rawStatus = String(row?.status ?? "").toUpperCase();
+  if (!tanggalKembali && rawStatus === "DIKEMBALIKAN") {
+    tanggalKembali = toIsoDate(row?.updated_at ?? row?.updatedAt) || "";
+  }
+
+  const bukuIdRaw = row?.buku_id ?? row?.bukuId ?? buku?.id ?? buku?.bukuId;
+  const bukuId =
+    bukuIdRaw != null && String(bukuIdRaw).trim()
+      ? String(bukuIdRaw).trim()
+      : undefined;
+
   const filePath = buku?.file_path ?? buku?.filePath ?? row?.file_path;
-  const digitalId = filePath ? String(bukuId ?? "") : undefined;
+  const hasDigitalFilePath =
+    typeof filePath === "string" && filePath.trim().length > 0;
+  const digitalId = hasDigitalFilePath && bukuId ? bukuId : undefined;
 
   const statusPerpanjangan =
     typeof row?.status_perpanjangan === "string"
@@ -99,12 +121,13 @@ function mapLoanToBorrowedBook(row: any): BorrowedBook {
 
   return {
     id: String(loanId),
+    bukuId,
     judul,
     penulis,
     tanggalPinjam: tanggalPinjam || "",
     jatuhTempo: jatuhTempo || "",
-    tanggalKembali,
-    digitalId: digitalId && digitalId !== "" ? digitalId : undefined,
+    tanggalKembali: tanggalKembali || undefined,
+    digitalId,
     status: typeof row?.status === "string" ? row.status : undefined,
     statusPerpanjangan,
     akhirPerpanjangan,
@@ -121,12 +144,34 @@ function formatDate(isoDate: string) {
   }).format(d);
 }
 
+function isoDateToUtcMs(isoDate: string): number | null {
+  if (!isoDate) return null;
+
+  const match = /^\s*(\d{4})-(\d{2})-(\d{2})\s*$/.exec(isoDate);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+
+  if (
+    !Number.isFinite(year) ||
+    !Number.isFinite(month) ||
+    !Number.isFinite(day)
+  ) {
+    return null;
+  }
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+  return Date.UTC(year, month - 1, day);
+}
+
 function daysUntilDue(jatuhTempoIso: string, now: Date): number | null {
-  if (!jatuhTempoIso) return null;
-  const due = new Date(`${jatuhTempoIso}T23:59:59`);
-  if (Number.isNaN(due.getTime())) return null;
+  const dueUtc = isoDateToUtcMs(jatuhTempoIso);
+  if (dueUtc == null) return null;
+  const nowUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
   const msPerDay = 24 * 60 * 60 * 1000;
-  return Math.ceil((due.getTime() - now.getTime()) / msPerDay);
+  return Math.round((dueUtc - nowUtc) / msPerDay);
 }
 
 function getStatus(item: BorrowedBook, now: Date): BorrowStatus {
@@ -161,14 +206,14 @@ function StatusPill({ status }: { status: BorrowStatus }) {
     status === "Dikembalikan"
       ? "bg-slate-100 text-slate-700"
       : status === "Diajukan"
-        ? "bg-slate-100 text-slate-700"
+        ? "bg-blue-50 text-blue-700 border border-blue-200"
         : status === "Ditolak"
-          ? "bg-rose-100 text-rose-700"
+          ? "bg-rose-50 text-rose-700 border border-rose-200"
           : status === "Disetujui"
-            ? "bg-slate-800 text-white"
+            ? "bg-emerald-600 text-white"
             : status === "Terlambat"
-              ? "bg-slate-900 text-white"
-              : "bg-white border text-slate-700";
+              ? "bg-rose-600 text-white"
+              : "bg-indigo-50 text-indigo-700 border border-indigo-200";
 
   return (
     <span
@@ -660,6 +705,23 @@ export default function BorrowedBooksPage() {
                     const isReturned =
                       status === "Dikembalikan" || Boolean(item.tanggalKembali);
 
+                    const returnedDeltaDays = (() => {
+                      if (!isReturned || !item.tanggalKembali) return null;
+                      const dueUtc = isoDateToUtcMs(item.jatuhTempo);
+                      const returnedUtc = isoDateToUtcMs(item.tanggalKembali);
+                      if (dueUtc == null || returnedUtc == null) return null;
+                      const msPerDay = 24 * 60 * 60 * 1000;
+                      return Math.round((returnedUtc - dueUtc) / msPerDay);
+                    })();
+
+                    const returnedLateDays =
+                      returnedDeltaDays != null && returnedDeltaDays > 0
+                        ? returnedDeltaDays
+                        : null;
+
+                    const returnedOnTime =
+                      returnedDeltaDays != null && returnedDeltaDays <= 0;
+
                     const until = daysUntilDue(item.jatuhTempo, now);
 
                     const dueAt = item.jatuhTempo
@@ -671,12 +733,22 @@ export default function BorrowedBooksPage() {
                       !Number.isNaN(dueAt.getTime()) &&
                       now > dueAt;
 
+                    const overdueDays =
+                      isPastDue && until != null ? Math.max(1, -until) : null;
+
                     const isSoon =
                       !isPastDue &&
                       until != null &&
                       until >= 0 &&
                       until <= 3 &&
                       !item.tanggalKembali;
+
+                    const dueSoonText = (() => {
+                      if (!isSoon || until == null) return null;
+                      if (until <= 0) return "Jatuh tempo hari ini";
+                      if (until === 1) return "Jatuh tempo besok";
+                      return `Jatuh tempo ${until} hari lagi`;
+                    })();
 
                     const isActiveLoan =
                       status === "Dipinjam" ||
@@ -716,7 +788,7 @@ export default function BorrowedBooksPage() {
                             {isSoon ? (
                               <div className="mt-1 inline-flex items-center gap-1 text-xs text-orange-600">
                                 <AlertCircle className="h-3.5 w-3.5" />
-                                Segera jatuh tempo!
+                                {dueSoonText ?? "Segera jatuh tempo!"}
                               </div>
                             ) : null}
                           </div>
@@ -724,6 +796,16 @@ export default function BorrowedBooksPage() {
                         <td className="px-6 py-4 align-top">
                           <div className="flex flex-col items-start gap-2">
                             <StatusPill status={status} />
+                            {returnedLateDays ? (
+                              <div className="inline-flex items-center gap-1 text-xs text-rose-700">
+                                <AlertCircle className="h-3.5 w-3.5" />
+                                Dikembalikan terlambat {returnedLateDays} hari
+                              </div>
+                            ) : returnedOnTime ? (
+                              <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                Tepat waktu
+                              </span>
+                            ) : null}
                             {perpanjanganLabel ? (
                               <div className="text-xs text-slate-600 whitespace-normal break-words">
                                 <span className="font-medium text-slate-900">
@@ -744,7 +826,16 @@ export default function BorrowedBooksPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 align-top">
-                          <div className="flex justify-end">
+                          <div className="flex flex-col items-end gap-2">
+                            {item.bukuId ? (
+                              <Link
+                                href={`/koleksi/${encodeURIComponent(item.bukuId)}`}
+                                className="inline-flex h-9 items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                              >
+                                Lihat Detail
+                              </Link>
+                            ) : null}
+
                             {item.digitalId ? (
                               <button
                                 type="button"
@@ -764,8 +855,8 @@ export default function BorrowedBooksPage() {
                               <div className="inline-flex max-w-full items-start gap-1.5 whitespace-normal text-xs text-rose-700">
                                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                                 <span>
-                                  Sudah jatuh tempo. Akan kena denda jika tidak
-                                  segera mengembalikan.
+                                  Terlambat {overdueDays ?? 1} hari. Akan kena
+                                  denda jika tidak segera mengembalikan.
                                 </span>
                               </div>
                             ) : canRequestExtension ? (
@@ -781,7 +872,7 @@ export default function BorrowedBooksPage() {
                                 <Calendar className="h-4 w-4" />
                                 Perpanjang
                               </button>
-                            ) : (
+                            ) : item.bukuId ? null : (
                               <span className="text-slate-400">—</span>
                             )}
                           </div>
