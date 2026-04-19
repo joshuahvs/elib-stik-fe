@@ -2,8 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { AlertCircle, Calendar, Minus, Plus, X } from "lucide-react";
 import { fetchDigitalSignedUrl, openInNewTab } from "@/app/lib/booksDigital";
-import { fetchRiwayatPeminjamanMe } from "@/app/lib/peminjamanBuku";
+import {
+  ajukanPerpanjanganPeminjaman,
+  fetchRiwayatPeminjamanMe,
+} from "@/app/lib/peminjamanBuku";
 import ErrorMessage, { getErrorMessage } from "@/app/components/ErrorMessage";
 
 type BorrowStatus =
@@ -117,6 +121,14 @@ function formatDate(isoDate: string) {
   }).format(d);
 }
 
+function daysUntilDue(jatuhTempoIso: string, now: Date): number | null {
+  if (!jatuhTempoIso) return null;
+  const due = new Date(`${jatuhTempoIso}T23:59:59`);
+  if (Number.isNaN(due.getTime())) return null;
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.ceil((due.getTime() - now.getTime()) / msPerDay);
+}
+
 function getStatus(item: BorrowedBook, now: Date): BorrowStatus {
   const backend = String(item.status ?? "").toUpperCase();
   if (backend === "DIAJUKAN") return "Diajukan";
@@ -172,6 +184,198 @@ function StatusPill({ status }: { status: BorrowStatus }) {
   );
 }
 
+type PerpanjanganModalProps = {
+  open: boolean;
+  judulBuku: string;
+  durasiHari: number;
+  submitting: boolean;
+  error: unknown;
+  onClose: () => void;
+  onChangeDurasi: (n: number) => void;
+  onSubmit: () => void;
+};
+
+function PerpanjanganModal({
+  open,
+  judulBuku,
+  durasiHari,
+  submitting,
+  error,
+  onClose,
+  onChangeDurasi,
+  onSubmit,
+}: PerpanjanganModalProps) {
+  if (!open) return null;
+
+  const selected = Math.max(1, Math.min(30, Math.trunc(durasiHari)));
+  const presets = [3, 7, 14];
+
+  function setPreset(n: number) {
+    if (submitting) return;
+    onChangeDurasi(n);
+  }
+
+  function dec() {
+    if (submitting) return;
+    onChangeDurasi(Math.max(1, selected - 1));
+  }
+
+  function inc() {
+    if (submitting) return;
+    onChangeDurasi(Math.min(30, selected + 1));
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-slate-900/50" />
+
+      <div className="relative w-full max-w-xl rounded-2xl bg-white shadow-xl border">
+        <div className="flex items-start justify-between gap-4 px-8 pt-7">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">
+              Perpanjang Peminjaman
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Pilih durasi perpanjangan peminjaman buku Anda
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (!submitting) onClose();
+            }}
+            className="rounded-lg p-2 text-slate-500 hover:bg-slate-50"
+            aria-label="Tutup"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="px-8 pb-7 pt-5">
+          <div className="text-xs text-slate-500">{judulBuku}</div>
+          <div className="mt-4 text-sm text-slate-700">
+            Berapa lama Anda ingin memperpanjang peminjaman?
+          </div>
+
+          <ErrorMessage error={error} className="mt-4" />
+
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            {presets.map((n) => {
+              const isActive = n === selected;
+              return (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setPreset(n)}
+                  disabled={submitting}
+                  className={[
+                    "rounded-xl border px-4 py-4 text-center transition-colors",
+                    isActive
+                      ? "bg-gradient-to-r from-[#733015] to-[#8b5529] text-white border-transparent"
+                      : "bg-white text-slate-900 border-slate-200 hover:bg-slate-50",
+                    submitting ? "opacity-80" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  <div className="text-xl font-semibold leading-none">{n}</div>
+                  <div
+                    className={[
+                      "mt-1 text-xs",
+                      isActive ? "text-white/90" : "text-slate-600",
+                    ].join(" ")}
+                  >
+                    hari
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-5 border-t" />
+
+          <div className="mt-5 text-xs text-slate-600">
+            Atau pilih durasi kustom:
+          </div>
+
+          <div className="mt-3 flex items-center justify-between gap-4">
+            <button
+              type="button"
+              onClick={dec}
+              disabled={submitting || selected <= 1}
+              className={[
+                "h-10 w-10 rounded-lg border flex items-center justify-center",
+                "bg-slate-50 text-slate-700 border-slate-200",
+                "disabled:opacity-50 disabled:cursor-not-allowed",
+              ].join(" ")}
+              aria-label="Kurangi hari"
+            >
+              <Minus className="h-4 w-4" />
+            </button>
+
+            <div className="flex-1 text-center">
+              <div className="text-2xl font-semibold text-slate-900">
+                {selected}
+                <span className="text-sm font-medium text-slate-700">
+                  {" "}
+                  hari
+                </span>
+              </div>
+              <div className="mt-1 text-xs text-slate-500">
+                Maksimal 30 hari
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={inc}
+              disabled={submitting || selected >= 30}
+              className={[
+                "h-10 w-10 rounded-lg border flex items-center justify-center",
+                "bg-slate-50 text-slate-700 border-slate-200",
+                "disabled:opacity-50 disabled:cursor-not-allowed",
+              ].join(" ")}
+              aria-label="Tambah hari"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mt-6 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (!submitting) onClose();
+              }}
+              disabled={submitting}
+              className={[
+                "h-10 rounded-lg border px-4 text-sm font-medium",
+                "border-slate-200 text-slate-700 hover:bg-slate-50",
+                "disabled:opacity-60 disabled:cursor-not-allowed",
+              ].join(" ")}
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={submitting}
+              className={[
+                "h-10 rounded-lg px-4 text-sm font-medium text-white",
+                "bg-gradient-to-r from-[#733015] to-[#8b5529]",
+                "disabled:opacity-60 disabled:cursor-not-allowed",
+              ].join(" ")}
+            >
+              {submitting ? "Memproses…" : `Perpanjang ${selected} Hari`}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function BorrowedBooksPage() {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -179,8 +383,63 @@ export default function BorrowedBooksPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [books, setBooks] = useState<BorrowedBook[]>([]);
   const [totalItems, setTotalItems] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const [openingDigitalId, setOpeningDigitalId] = useState<string | null>(null);
+
+  const [perpanjanganOpen, setPerpanjanganOpen] = useState(false);
+  const [perpanjanganLoan, setPerpanjanganLoan] = useState<BorrowedBook | null>(
+    null,
+  );
+  const [perpanjanganDurasi, setPerpanjanganDurasi] = useState<number>(7);
+  const [perpanjanganSubmitting, setPerpanjanganSubmitting] =
+    useState<boolean>(false);
+  const [perpanjanganError, setPerpanjanganError] = useState<unknown>(null);
+
+  function openPerpanjangan(item: BorrowedBook) {
+    setPerpanjanganLoan(item);
+    setPerpanjanganDurasi(7);
+    setPerpanjanganError(null);
+    setPerpanjanganOpen(true);
+  }
+
+  function closePerpanjangan(force = false) {
+    if (perpanjanganSubmitting && !force) return;
+    setPerpanjanganOpen(false);
+    setPerpanjanganLoan(null);
+    setPerpanjanganError(null);
+  }
+
+  async function submitPerpanjangan() {
+    const authToken = window.localStorage.getItem("token");
+    if (!authToken) {
+      window.location.href = "/auth/login";
+      return;
+    }
+
+    const loan = perpanjanganLoan;
+    if (!loan) return;
+
+    try {
+      setPerpanjanganSubmitting(true);
+      setPerpanjanganError(null);
+      setActionError(null);
+
+      await ajukanPerpanjanganPeminjaman({
+        token: authToken,
+        loanId: loan.id,
+        durasiHari: perpanjanganDurasi,
+      });
+
+      closePerpanjangan(true);
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      setPerpanjanganError(e);
+      setActionError(getErrorMessage(e, "Gagal mengajukan perpanjangan"));
+    } finally {
+      setPerpanjanganSubmitting(false);
+    }
+  }
 
   async function handleOpenDigital(digitalId: string) {
     const token = window.localStorage.getItem("token");
@@ -299,7 +558,7 @@ export default function BorrowedBooksPage() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [page, pageSize, token]);
+  }, [page, pageSize, refreshKey, token]);
 
   return (
     <div className="min-h-screen bg-white">
@@ -367,7 +626,9 @@ export default function BorrowedBooksPage() {
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-50 text-slate-700">
                   <tr>
-                    <th className="text-left font-semibold px-6 py-3">ID</th>
+                    <th className="text-left font-semibold px-6 py-3">
+                      Peminjaman #
+                    </th>
                     <th className="text-left font-semibold px-6 py-3">Buku</th>
                     <th className="text-left font-semibold px-6 py-3">
                       Tanggal Pinjam
@@ -382,15 +643,29 @@ export default function BorrowedBooksPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {pageItems.map((item) => {
+                  {pageItems.map((item, idx) => {
                     const status = getStatus(item, now);
                     const perpanjanganLabel = formatPerpanjanganStatus(
                       item.statusPerpanjangan,
                     );
+
+                    const until = daysUntilDue(item.jatuhTempo, now);
+                    const isSoon =
+                      until != null &&
+                      until >= 0 &&
+                      until <= 3 &&
+                      !item.tanggalKembali;
+                    const canRequestExtension =
+                      !item.digitalId &&
+                      (status === "Dipinjam" || status === "Terlambat") &&
+                      (perpanjanganLabel == null ||
+                        perpanjanganLabel === "Ditolak") &&
+                      (status === "Terlambat" || isSoon);
+
                     return (
                       <tr key={item.id} className="hover:bg-slate-50">
                         <td className="px-6 py-4 whitespace-nowrap text-slate-700">
-                          {item.id}
+                          {startIndex + idx}
                         </td>
                         <td className="px-6 py-4">
                           <div className="font-semibold text-slate-900">
@@ -404,7 +679,19 @@ export default function BorrowedBooksPage() {
                             : "—"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-slate-700">
-                          {item.jatuhTempo ? formatDate(item.jatuhTempo) : "—"}
+                          <div className="flex flex-col items-start">
+                            <div>
+                              {item.jatuhTempo
+                                ? formatDate(item.jatuhTempo)
+                                : "—"}
+                            </div>
+                            {isSoon ? (
+                              <div className="mt-1 inline-flex items-center gap-1 text-xs text-orange-600">
+                                <AlertCircle className="h-3.5 w-3.5" />
+                                Segera jatuh tempo!
+                              </div>
+                            ) : null}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex flex-col items-start gap-2">
@@ -441,6 +728,19 @@ export default function BorrowedBooksPage() {
                               {openingDigitalId === item.digitalId
                                 ? "Membuka…"
                                 : "Baca Digital"}
+                            </button>
+                          ) : canRequestExtension ? (
+                            <button
+                              type="button"
+                              onClick={() => openPerpanjangan(item)}
+                              className={[
+                                "inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-medium text-white",
+                                "bg-gradient-to-r from-[#733015] to-[#8b5529]",
+                                "hover:opacity-95",
+                              ].join(" ")}
+                            >
+                              <Calendar className="h-4 w-4" />
+                              Perpanjang
                             </button>
                           ) : (
                             <span className="text-slate-400">—</span>
@@ -521,6 +821,17 @@ export default function BorrowedBooksPage() {
             </div>
           ) : null}
         </section>
+
+        <PerpanjanganModal
+          open={perpanjanganOpen}
+          judulBuku={perpanjanganLoan?.judul ?? ""}
+          durasiHari={perpanjanganDurasi}
+          submitting={perpanjanganSubmitting}
+          error={perpanjanganError}
+          onClose={closePerpanjangan}
+          onChangeDurasi={setPerpanjanganDurasi}
+          onSubmit={submitPerpanjangan}
+        />
       </main>
     </div>
   );
