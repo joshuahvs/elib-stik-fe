@@ -177,6 +177,7 @@ export async function updatePeminjamanBukuByAdmin(opts: {
   status: string;
   tanggal_peminjaman?: string;
   akhir_peminjaman?: string;
+  tanggal_pengembalian?: string;
 }): Promise<any> {
   const res = await fetch(`${API_URL}/peminjaman-buku/${encodeURIComponent(opts.id)}`, {
     method: "PATCH",
@@ -189,6 +190,7 @@ export async function updatePeminjamanBukuByAdmin(opts: {
       status: opts.status,
       tanggal_peminjaman: opts.tanggal_peminjaman,
       akhir_peminjaman: opts.akhir_peminjaman,
+      tanggal_pengembalian: opts.tanggal_pengembalian,
     }),
   });
 

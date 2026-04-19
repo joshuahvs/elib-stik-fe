@@ -17,14 +17,31 @@ function getRole(me: any): string | undefined {
 function toIsoDate(value: any): string {
   if (typeof value === "string") {
     const s = value.trim();
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const lead = /^(\d{4}-\d{2}-\d{2})/.exec(s);
+    if (lead) return lead[1];
     const d = new Date(s);
-    if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    if (!Number.isNaN(d.getTime())) {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    }
   }
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toISOString().slice(0, 10);
+    const yyyy = value.getFullYear();
+    const mm = String(value.getMonth() + 1).padStart(2, "0");
+    const dd = String(value.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
   }
   return "";
+}
+
+function todayIsoLocal(): string {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function formatDate(isoDate: string) {
@@ -43,17 +60,25 @@ function statusLabel(statusRaw: any): string {
   if (s === "DIAJUKAN") return "Diajukan";
   if (s === "DISETUJUI") return "Disetujui";
   if (s === "DITOLAK") return "Ditolak";
-  if (s === "DIPINJAM") return "Dipinjam";
+  if (s === "DIPINJAM" || s === "DIAMBIL") return "Diambil";
   if (s === "DIKEMBALIKAN") return "Dikembalikan";
   return String(statusRaw ?? "-");
 }
 
 function statusBadgeClass(statusRaw: any): string {
   const s = String(statusRaw ?? "").toUpperCase();
-  if (s === "DIAJUKAN") return "bg-slate-100 text-slate-700";
-  if (s === "DISETUJUI") return "bg-slate-900 text-white";
-  if (s === "DITOLAK") return "bg-rose-100 text-rose-700";
+  if (s === "DIAJUKAN") return "bg-blue-600 text-white";
+  if (s === "DISETUJUI") return "bg-green-600 text-white";
+  if (s === "DIPINJAM" || s === "DIAMBIL") return "bg-purple-600 text-white";
+  if (s === "DIKEMBALIKAN") return "bg-slate-200 text-slate-700";
+  if (s === "DITOLAK") return "bg-red-600 text-white";
   return "bg-white border text-slate-700";
+}
+
+function normalizeStatus(statusRaw: any): string {
+  const s = String(statusRaw ?? "").toUpperCase();
+  if (s === "DIAMBIL") return "DIPINJAM";
+  return s;
 }
 
 function pickFirstString(obj: any, keys: string[]): string | undefined {
@@ -172,6 +197,9 @@ export default function AdminBorrowedBookRequestsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [approveError, setApproveError] = useState<string | null>(null);
 
+  const [mutatingId, setMutatingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
   useEffect(() => {
     const t = localStorage.getItem("token");
     setToken(t);
@@ -198,6 +226,7 @@ export default function AdminBorrowedBookRequestsPage() {
 
     setIsLoading(true);
     setError(null);
+    setActionError(null);
 
     try {
       const res = await fetchAdminPeminjamanBuku({
@@ -330,6 +359,53 @@ export default function AdminBorrowedBookRequestsPage() {
     }
   }
 
+  async function setStatus(opts: {
+    rowId: string;
+    prevStatus: string;
+    nextStatus: string;
+  }) {
+    if (!token) return;
+
+    const prev = opts.prevStatus;
+    const next = opts.nextStatus;
+    if (!next || next === prev) return;
+
+    setRows((current) =>
+      current.map((r) => (r.id === opts.rowId ? { ...r, status: next } : r)),
+    );
+
+    try {
+      setMutatingId(opts.rowId);
+      setActionError(null);
+      await updatePeminjamanBukuByAdmin({
+        token,
+        id: opts.rowId,
+        status: next,
+        tanggal_pengembalian:
+          next === "DIKEMBALIKAN" ? todayIsoLocal() : undefined,
+      });
+    } catch (e) {
+      setRows((current) =>
+        current.map((r) => (r.id === opts.rowId ? { ...r, status: prev } : r)),
+      );
+      setActionError(getErrorMessage(e, "Gagal mengubah status peminjaman"));
+    } finally {
+      setMutatingId(null);
+    }
+  }
+
+  async function reject(row: AdminLoanRow) {
+    const ok = window.confirm("Tolak permintaan peminjaman ini?");
+    if (!ok) return;
+
+    const prev = normalizeStatus(row.status);
+    await setStatus({
+      rowId: row.id,
+      prevStatus: prev,
+      nextStatus: "DITOLAK",
+    });
+  }
+
   const empty = !isLoading && rows.length === 0;
 
   return (
@@ -399,6 +475,12 @@ export default function AdminBorrowedBookRequestsPage() {
               </button>
             </div>
 
+            {actionError ? (
+              <div className="px-6 pt-6">
+                <ErrorMessage error={actionError} />
+              </div>
+            ) : null}
+
             {error && !isLoading ? (
               <div className="px-6 py-6">
                 <ErrorMessage error={error} />
@@ -441,8 +523,15 @@ export default function AdminBorrowedBookRequestsPage() {
                   </thead>
                   <tbody className="divide-y">
                     {rows.map((r) => {
-                      const isPending =
-                        String(r.status).toUpperCase() === "DIAJUKAN";
+                      const normalizedStatus = normalizeStatus(r.status);
+                      const isPending = normalizedStatus === "DIAJUKAN";
+                      const isReturned = normalizedStatus === "DIKEMBALIKAN";
+
+                      const canEditStatus =
+                        !isPending &&
+                        !isReturned &&
+                        (normalizedStatus === "DISETUJUI" ||
+                          normalizedStatus === "DIPINJAM");
 
                       const resolvedUser =
                         (r.userId ? userNameById[r.userId] : undefined) ??
@@ -476,24 +565,96 @@ export default function AdminBorrowedBookRequestsPage() {
                               : "-"}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span
-                              className={[
-                                "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
-                                statusBadgeClass(r.status),
-                              ].join(" ")}
-                            >
-                              {statusLabel(r.status)}
-                            </span>
+                            {canEditStatus ? (
+                              <div className="relative inline-flex">
+                                <select
+                                  value={normalizedStatus}
+                                  onChange={(e) => {
+                                    const next = String(e.target.value);
+                                    void setStatus({
+                                      rowId: r.id,
+                                      prevStatus: normalizedStatus,
+                                      nextStatus: next,
+                                    });
+                                  }}
+                                  disabled={mutatingId === r.id}
+                                  className={[
+                                    "h-7 rounded-full pl-3 pr-8 text-xs font-medium",
+                                    "appearance-none",
+                                    "focus:outline-none focus:ring-2 focus:ring-slate-200",
+                                    statusBadgeClass(normalizedStatus),
+                                    mutatingId === r.id
+                                      ? "opacity-60 cursor-not-allowed"
+                                      : "cursor-pointer",
+                                  ].join(" ")}
+                                >
+                                  {normalizedStatus === "DISETUJUI" ? (
+                                    <>
+                                      <option value="DISETUJUI">
+                                        {statusLabel("DISETUJUI")}
+                                      </option>
+                                      <option value="DIPINJAM">
+                                        {statusLabel("DIPINJAM")}
+                                      </option>
+                                      <option value="DIKEMBALIKAN">
+                                        {statusLabel("DIKEMBALIKAN")}
+                                      </option>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <option value="DIPINJAM">
+                                        {statusLabel("DIPINJAM")}
+                                      </option>
+                                      <option value="DIKEMBALIKAN">
+                                        {statusLabel("DIKEMBALIKAN")}
+                                      </option>
+                                    </>
+                                  )}
+                                </select>
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  viewBox="0 0 20 20"
+                                  fill="currentColor"
+                                  className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 opacity-80"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.24 4.5a.75.75 0 01-1.08 0l-4.24-4.5a.75.75 0 01.02-1.06z"
+                                    clipRule="evenodd"
+                                  />
+                                </svg>
+                              </div>
+                            ) : (
+                              <span
+                                className={[
+                                  "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
+                                  statusBadgeClass(normalizedStatus),
+                                ].join(" ")}
+                              >
+                                {statusLabel(normalizedStatus)}
+                              </span>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             {isPending ? (
-                              <button
-                                type="button"
-                                onClick={() => openApproveModal(r)}
-                                className="inline-flex h-9 items-center rounded-lg bg-slate-900 px-3 text-sm font-medium text-white hover:bg-slate-800"
-                              >
-                                Setujui
-                              </button>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => openApproveModal(r)}
+                                  disabled={mutatingId === r.id}
+                                  className="inline-flex h-9 items-center rounded-lg bg-slate-900 px-3 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Setujui
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => reject(r)}
+                                  disabled={mutatingId === r.id}
+                                  className="inline-flex h-9 items-center rounded-lg bg-red-600 px-3 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Tolak
+                                </button>
+                              </div>
                             ) : (
                               <span className="text-slate-400">—</span>
                             )}
