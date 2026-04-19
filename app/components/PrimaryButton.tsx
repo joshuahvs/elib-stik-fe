@@ -6,10 +6,12 @@ type PrimaryButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement>;
 
 export default function PrimaryButton({
   className,
+  type = "button",
   ...props
 }: PrimaryButtonProps) {
   return (
     <button
+      type={type}
       {...props}
       className={[
         "w-full bg-gradient-to-r from-[#733015] to-[#8b5529]",
