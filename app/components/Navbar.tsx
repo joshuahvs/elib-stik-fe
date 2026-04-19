@@ -33,6 +33,9 @@ export default function Navbar({ items }: NavbarProps) {
 
   const isLoginPage = pathname === "/auth/login";
   const isRegisterPage = pathname === "/auth/register";
+  const isKunjunganPage = pathname === "/kunjungan";
+
+  const useTransparentStyle = isLoginPage || isRegisterPage || isKunjunganPage;
 
   const [adminOpen, setAdminOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
@@ -44,18 +47,21 @@ export default function Navbar({ items }: NavbarProps) {
   const userRef = useRef<HTMLDivElement>(null);
 
   const [isAuthed, setIsAuthed] = useState<boolean>(false);
-
   const [me, setMe] = useState<any>(null);
-
-  const navItems: NavbarItem[] = items ?? [
-    { label: "Beranda", href: "/" },
-    { label: "Koleksi", href: "/koleksi" },
-    { label: "Isi Buku Tamu", href: "#", disabled: true },
-  ];
 
   const role = getRole(me);
   const isAdmin = role === "admin";
   const displayName = getDisplayName(me) ?? "Akun";
+
+  const navItems: NavbarItem[] =
+    items ??
+    [
+      { label: "Beranda", href: "/" },
+      { label: "Koleksi", href: "/koleksi" },
+      ...(!isAdmin
+        ? [{ label: "Isi Buku Tamu", href: "/kunjungan" }]
+        : []),
+    ];
 
   function cancelAdminClose() {
     if (adminCloseTimer.current != null) {
@@ -165,10 +171,17 @@ export default function Navbar({ items }: NavbarProps) {
       if (e.key === "token") verify();
     }
 
+    function onProfileUpdated() {
+      verify();
+    }
+
     window.addEventListener("storage", onStorage);
+    window.addEventListener("profile-updated", onProfileUpdated);
+
     return () => {
       cancelled = true;
       window.removeEventListener("storage", onStorage);
+      window.removeEventListener("profile-updated", onProfileUpdated);
     };
   }, [items, pathname]);
 
@@ -176,7 +189,7 @@ export default function Navbar({ items }: NavbarProps) {
     <header
       className={[
         "w-full",
-        isLoginPage || isRegisterPage
+        useTransparentStyle
           ? "absolute top-0 left-0 z-50 bg-transparent border-b border-transparent"
           : "bg-white border-b",
       ]
@@ -187,7 +200,7 @@ export default function Navbar({ items }: NavbarProps) {
         <div
           className={[
             "text-lg font-semibold",
-            isLoginPage || isRegisterPage ? "text-white" : "text-slate-900",
+            useTransparentStyle ? "text-white" : "text-slate-900",
           ]
             .filter(Boolean)
             .join(" ")}
@@ -198,7 +211,7 @@ export default function Navbar({ items }: NavbarProps) {
         <nav
           className={[
             "flex items-center gap-8 text-sm",
-            isLoginPage || isRegisterPage ? "text-white/90" : "text-slate-700",
+            useTransparentStyle ? "text-white/90" : "text-slate-700",
           ]
             .filter(Boolean)
             .join(" ")}
@@ -208,14 +221,14 @@ export default function Navbar({ items }: NavbarProps) {
             const className = [
               "transition-colors",
               item.disabled
-                ? isLoginPage || isRegisterPage
+                ? useTransparentStyle
                   ? "text-white/40 cursor-not-allowed"
                   : "text-slate-400 cursor-not-allowed"
-                : isLoginPage || isRegisterPage
+                : useTransparentStyle
                   ? "hover:text-white"
                   : "hover:text-slate-900",
               isActive
-                ? isLoginPage || isRegisterPage
+                ? useTransparentStyle
                   ? "text-white font-semibold"
                   : "text-slate-900 font-semibold"
                 : "",
@@ -311,7 +324,7 @@ export default function Navbar({ items }: NavbarProps) {
               href="/auth/login"
               className={[
                 "transition-colors",
-                isLoginPage ? "hover:text-white" : "hover:text-slate-900",
+                useTransparentStyle ? "hover:text-white" : "hover:text-slate-900",
               ]
                 .filter(Boolean)
                 .join(" ")}
