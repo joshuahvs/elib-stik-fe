@@ -321,7 +321,7 @@ export default function Navbar({ items }: NavbarProps) {
                       className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
                       onClick={() => setAdminOpen(false)}
                     >
-                      Konten Landing Page
+                      Kelola Antarmuka
                     </Link>
                     <Link
                       href="/admin/users"
