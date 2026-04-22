@@ -180,6 +180,7 @@ export async function updatePeminjamanBukuByAdmin(opts: {
   tanggal_pengembalian?: string;
   status_perpanjangan?: string;
   akhir_perpanjangan?: string;
+  catatan?: string;
 }): Promise<any> {
   const res = await fetch(`${API_URL}/peminjaman-buku/${encodeURIComponent(opts.id)}`, {
     method: "PATCH",
@@ -195,6 +196,7 @@ export async function updatePeminjamanBukuByAdmin(opts: {
       tanggal_pengembalian: opts.tanggal_pengembalian,
       status_perpanjangan: opts.status_perpanjangan,
       akhir_perpanjangan: opts.akhir_perpanjangan,
+      catatan: opts.catatan,
     }),
   });
 
@@ -238,6 +240,7 @@ export async function setujuiPerpanjanganByAdmin(opts: {
 export async function tolakPerpanjanganByAdmin(opts: {
   token: string;
   id: string;
+  catatan?: string;
 }): Promise<any> {
   const res = await fetch(
     `${API_URL}/peminjaman-buku/${encodeURIComponent(opts.id)}/perpanjangan/tolak`,
@@ -246,7 +249,9 @@ export async function tolakPerpanjanganByAdmin(opts: {
       headers: {
         Authorization: `Bearer ${opts.token}`,
         Accept: "application/json",
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify({ catatan: opts.catatan }),
     },
   );
 

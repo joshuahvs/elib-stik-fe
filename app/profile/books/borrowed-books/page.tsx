@@ -30,6 +30,7 @@ type BorrowedBook = {
   status?: string;
   statusPerpanjangan?: string;
   akhirPerpanjangan?: string;
+  catatan?: string;
 };
 
 function pickFirstString(obj: any, keys: string[]): string | undefined {
@@ -119,6 +120,11 @@ function mapLoanToBorrowedBook(row: any): BorrowedBook {
   const akhirPerpanjangan =
     toIsoDate(row?.akhir_perpanjangan ?? row?.akhirPerpanjangan) || undefined;
 
+  const catatan =
+    typeof row?.catatan === "string"
+      ? row.catatan.trim() || undefined
+      : undefined;
+
   return {
     id: String(loanId),
     bukuId,
@@ -131,6 +137,7 @@ function mapLoanToBorrowedBook(row: any): BorrowedBook {
     status: typeof row?.status === "string" ? row.status : undefined,
     statusPerpanjangan,
     akhirPerpanjangan,
+    catatan,
   };
 }
 
@@ -199,6 +206,16 @@ function formatPerpanjanganStatus(statusRaw: any): string | null {
   if (s === "DISETUJUI") return "Disetujui";
   if (s === "DITOLAK") return "Ditolak";
   return raw;
+}
+
+function getEffectiveDueDate(item: BorrowedBook): string {
+  const extStatus = String(item.statusPerpanjangan ?? "")
+    .trim()
+    .toUpperCase();
+  if (extStatus === "DISETUJUI" && item.akhirPerpanjangan) {
+    return item.akhirPerpanjangan;
+  }
+  return item.jatuhTempo;
 }
 
 function StatusPill({ status }: { status: BorrowStatus }) {
@@ -701,13 +718,17 @@ export default function BorrowedBooksPage() {
                     const perpanjanganLabel = formatPerpanjanganStatus(
                       item.statusPerpanjangan,
                     );
+                    const effectiveDueDate = getEffectiveDueDate(item);
+                    const showAlasanDitolak =
+                      Boolean(item.catatan) &&
+                      (status === "Ditolak" || perpanjanganLabel === "Ditolak");
 
                     const isReturned =
                       status === "Dikembalikan" || Boolean(item.tanggalKembali);
 
                     const returnedDeltaDays = (() => {
                       if (!isReturned || !item.tanggalKembali) return null;
-                      const dueUtc = isoDateToUtcMs(item.jatuhTempo);
+                      const dueUtc = isoDateToUtcMs(effectiveDueDate);
                       const returnedUtc = isoDateToUtcMs(item.tanggalKembali);
                       if (dueUtc == null || returnedUtc == null) return null;
                       const msPerDay = 24 * 60 * 60 * 1000;
@@ -722,10 +743,10 @@ export default function BorrowedBooksPage() {
                     const returnedOnTime =
                       returnedDeltaDays != null && returnedDeltaDays <= 0;
 
-                    const until = daysUntilDue(item.jatuhTempo, now);
+                    const until = daysUntilDue(effectiveDueDate, now);
 
-                    const dueAt = item.jatuhTempo
-                      ? new Date(`${item.jatuhTempo}T23:59:59`)
+                    const dueAt = effectiveDueDate
+                      ? new Date(`${effectiveDueDate}T23:59:59`)
                       : null;
                     const isPastDue =
                       !isReturned &&
@@ -750,17 +771,9 @@ export default function BorrowedBooksPage() {
                       return `Jatuh tempo ${until} hari lagi`;
                     })();
 
-                    const isActiveLoan =
-                      status === "Dipinjam" ||
-                      status === "Terlambat" ||
-                      status === "Disetujui";
-
                     const canRequestExtension =
-                      !item.digitalId &&
-                      isActiveLoan &&
-                      !isPastDue &&
-                      (perpanjanganLabel == null ||
-                        perpanjanganLabel === "Ditolak");
+                      (status === "Dipinjam" || status === "Disetujui") &&
+                      !isPastDue;
 
                     return (
                       <tr key={item.id} className="hover:bg-slate-50">
@@ -781,8 +794,8 @@ export default function BorrowedBooksPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-slate-700">
                           <div className="flex flex-col items-start">
                             <div>
-                              {item.jatuhTempo
-                                ? formatDate(item.jatuhTempo)
+                              {effectiveDueDate
+                                ? formatDate(effectiveDueDate)
                                 : "—"}
                             </div>
                             {isSoon ? (
@@ -823,6 +836,14 @@ export default function BorrowedBooksPage() {
                                 ) : null}
                               </div>
                             ) : null}
+                            {showAlasanDitolak ? (
+                              <div className="text-xs text-rose-700 whitespace-normal break-words">
+                                <span className="font-medium">
+                                  Alasan ditolak:
+                                </span>{" "}
+                                {item.catatan}
+                              </div>
+                            ) : null}
                           </div>
                         </td>
                         <td className="px-6 py-4 align-top">
@@ -851,15 +872,9 @@ export default function BorrowedBooksPage() {
                                   ? "Membuka…"
                                   : "Baca Digital"}
                               </button>
-                            ) : isPastDue ? (
-                              <div className="inline-flex max-w-full items-start gap-1.5 whitespace-normal text-xs text-rose-700">
-                                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                                <span>
-                                  Terlambat {overdueDays ?? 1} hari. Akan kena
-                                  denda jika tidak segera mengembalikan.
-                                </span>
-                              </div>
-                            ) : canRequestExtension ? (
+                            ) : null}
+
+                            {canRequestExtension ? (
                               <button
                                 type="button"
                                 onClick={() => openPerpanjangan(item)}
@@ -872,6 +887,14 @@ export default function BorrowedBooksPage() {
                                 <Calendar className="h-4 w-4" />
                                 Perpanjang
                               </button>
+                            ) : isPastDue ? (
+                              <div className="inline-flex max-w-full items-start gap-1.5 whitespace-normal text-xs text-rose-700">
+                                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                                <span>
+                                  Terlambat {overdueDays ?? 1} hari. Akan kena
+                                  denda jika tidak segera mengembalikan.
+                                </span>
+                              </div>
                             ) : item.bukuId ? null : (
                               <span className="text-slate-400">—</span>
                             )}

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { API_URL } from "@/app/lib/api";
@@ -196,16 +197,40 @@ export default function Navbar({ items }: NavbarProps) {
         .join(" ")}
     >
       <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
-        <div
-          className={[
-            "text-lg font-semibold",
-            useTransparentStyle ? "text-white" : "text-slate-900",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          eLib
-        </div>
+        <Link href="/" className="flex items-center gap-3">
+          <div className="relative h-10 w-10 overflow-hidden rounded-full border border-slate-200 bg-white/90 shadow-sm">
+            <Image
+              src="/logo-polisi.png"
+              alt="Logo STIK"
+              fill
+              sizes="40px"
+              className="object-contain p-1"
+              priority
+            />
+          </div>
+          <div className="flex flex-col leading-tight">
+            <span
+              className={[
+                "text-xs font-semibold uppercase tracking-[0.16em]",
+                useTransparentStyle ? "text-white/80" : "text-slate-500",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              E-Library
+            </span>
+            <span
+              className={[
+                "text-sm font-bold sm:text-base",
+                useTransparentStyle ? "text-white" : "text-slate-900",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              Sekolah Tinggi Ilmu Kepolisian
+            </span>
+          </div>
+        </Link>
 
         <nav
           className={[
