@@ -216,6 +216,41 @@ export async function updatePeminjamanBukuByAdmin(opts: {
   return data;
 }
 
+export async function transitionPeminjamanStatusByAdmin(opts: {
+  token: string;
+  id: string;
+  status: string;
+  catatan?: string;
+}): Promise<any> {
+  const res = await fetch(
+    `${API_URL}/peminjaman-buku/${encodeURIComponent(opts.id)}/status`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${opts.token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        status: opts.status,
+        catatan: opts.catatan,
+      }),
+    },
+  );
+
+  const { data, textBody } = await parseJsonOrText(res);
+  if (!res.ok) {
+    const msg = pickErrorMessage(
+      data,
+      textBody,
+      "Gagal mengubah status peminjaman",
+    );
+    throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+  }
+
+  return data;
+}
+
 export async function setujuiPerpanjanganByAdmin(opts: {
   token: string;
   id: string;
