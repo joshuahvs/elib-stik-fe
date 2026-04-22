@@ -178,6 +178,8 @@ export async function updatePeminjamanBukuByAdmin(opts: {
   tanggal_peminjaman?: string;
   akhir_peminjaman?: string;
   tanggal_pengembalian?: string;
+  status_perpanjangan?: string;
+  akhir_perpanjangan?: string;
 }): Promise<any> {
   const res = await fetch(`${API_URL}/peminjaman-buku/${encodeURIComponent(opts.id)}`, {
     method: "PATCH",
@@ -191,12 +193,66 @@ export async function updatePeminjamanBukuByAdmin(opts: {
       tanggal_peminjaman: opts.tanggal_peminjaman,
       akhir_peminjaman: opts.akhir_peminjaman,
       tanggal_pengembalian: opts.tanggal_pengembalian,
+      status_perpanjangan: opts.status_perpanjangan,
+      akhir_perpanjangan: opts.akhir_perpanjangan,
     }),
   });
 
   const { data, textBody } = await parseJsonOrText(res);
   if (!res.ok) {
     const msg = pickErrorMessage(data, textBody, "Gagal memperbarui peminjaman");
+    throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+  }
+
+  return data;
+}
+
+export async function setujuiPerpanjanganByAdmin(opts: {
+  token: string;
+  id: string;
+}): Promise<any> {
+  const res = await fetch(
+    `${API_URL}/peminjaman-buku/${encodeURIComponent(opts.id)}/perpanjangan/setujui`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${opts.token}`,
+        Accept: "application/json",
+      },
+    },
+  );
+
+  const { data, textBody } = await parseJsonOrText(res);
+  if (!res.ok) {
+    const msg = pickErrorMessage(
+      data,
+      textBody,
+      "Gagal menyetujui perpanjangan",
+    );
+    throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+  }
+
+  return data;
+}
+
+export async function tolakPerpanjanganByAdmin(opts: {
+  token: string;
+  id: string;
+}): Promise<any> {
+  const res = await fetch(
+    `${API_URL}/peminjaman-buku/${encodeURIComponent(opts.id)}/perpanjangan/tolak`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${opts.token}`,
+        Accept: "application/json",
+      },
+    },
+  );
+
+  const { data, textBody } = await parseJsonOrText(res);
+  if (!res.ok) {
+    const msg = pickErrorMessage(data, textBody, "Gagal menolak perpanjangan");
     throw new Error(`${res.status} ${res.statusText}: ${msg}`);
   }
 
