@@ -2,10 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import Navbar from "@/app/components/Navbar";
 import { API_URL } from "@/app/lib/api";
+import { fetchAdminUsers } from "@/app/lib/adminUsers";
 import {
   fetchAdminPeminjamanBuku,
+  setujuiPerpanjanganByAdmin,
+  tolakPerpanjanganByAdmin,
+  transitionPeminjamanStatusByAdmin,
   updatePeminjamanBukuByAdmin,
 } from "@/app/lib/peminjamanBuku";
 import ErrorMessage, { getErrorMessage } from "@/app/components/ErrorMessage";
@@ -17,12 +20,21 @@ function getRole(me: any): string | undefined {
 function toIsoDate(value: any): string {
   if (typeof value === "string") {
     const s = value.trim();
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const lead = /^(\d{4}-\d{2}-\d{2})/.exec(s);
+    if (lead) return lead[1];
     const d = new Date(s);
-    if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    if (!Number.isNaN(d.getTime())) {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    }
   }
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toISOString().slice(0, 10);
+    const yyyy = value.getFullYear();
+    const mm = String(value.getMonth() + 1).padStart(2, "0");
+    const dd = String(value.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
   }
   return "";
 }
@@ -43,17 +55,25 @@ function statusLabel(statusRaw: any): string {
   if (s === "DIAJUKAN") return "Diajukan";
   if (s === "DISETUJUI") return "Disetujui";
   if (s === "DITOLAK") return "Ditolak";
-  if (s === "DIPINJAM") return "Dipinjam";
+  if (s === "DIPINJAM" || s === "DIAMBIL") return "Diambil";
   if (s === "DIKEMBALIKAN") return "Dikembalikan";
   return String(statusRaw ?? "-");
 }
 
 function statusBadgeClass(statusRaw: any): string {
   const s = String(statusRaw ?? "").toUpperCase();
-  if (s === "DIAJUKAN") return "bg-slate-100 text-slate-700";
-  if (s === "DISETUJUI") return "bg-slate-900 text-white";
-  if (s === "DITOLAK") return "bg-rose-100 text-rose-700";
+  if (s === "DIAJUKAN") return "bg-blue-600 text-white";
+  if (s === "DISETUJUI") return "bg-green-600 text-white";
+  if (s === "DIPINJAM" || s === "DIAMBIL") return "bg-purple-600 text-white";
+  if (s === "DIKEMBALIKAN") return "bg-slate-200 text-slate-700";
+  if (s === "DITOLAK") return "bg-red-600 text-white";
   return "bg-white border text-slate-700";
+}
+
+function normalizeStatus(statusRaw: any): string {
+  const s = String(statusRaw ?? "").toUpperCase();
+  if (s === "DIAMBIL") return "DIPINJAM";
+  return s;
 }
 
 function pickFirstString(obj: any, keys: string[]): string | undefined {
@@ -64,13 +84,79 @@ function pickFirstString(obj: any, keys: string[]): string | undefined {
   return undefined;
 }
 
+function parseRequestedPeriodeHari(raw: unknown): number | null {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    const n = Math.trunc(raw);
+    return n > 0 ? n : null;
+  }
+  if (typeof raw === "string") {
+    const n = Number(raw.trim());
+    if (!Number.isFinite(n)) return null;
+    const int = Math.trunc(n);
+    return int > 0 ? int : null;
+  }
+  return null;
+}
+
+function isoDateToUtcMs(isoDate: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate.trim());
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mon = Number(m[2]);
+  const d = Number(m[3]);
+  if (!Number.isFinite(y) || !Number.isFinite(mon) || !Number.isFinite(d)) {
+    return null;
+  }
+  if (mon < 1 || mon > 12 || d < 1 || d > 31) return null;
+  return Date.UTC(y, mon - 1, d);
+}
+
+function computePeriodeFromDates(
+  tanggalPeminjaman?: string,
+  akhirPeminjaman?: string,
+): number | null {
+  if (!tanggalPeminjaman || !akhirPeminjaman) return null;
+  const startMs = isoDateToUtcMs(tanggalPeminjaman);
+  const endMs = isoDateToUtcMs(akhirPeminjaman);
+  if (startMs == null || endMs == null) return null;
+  const diffDays = Math.round((endMs - startMs) / (24 * 60 * 60 * 1000));
+  return diffDays > 0 ? diffDays : null;
+}
+
+function isLikelyUuid(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  const s = value.trim();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    s,
+  );
+}
+
 type AdminLoanRow = {
   id: string;
   status: string;
+  statusPerpanjangan?: string;
+  catatan?: string;
   tanggal_peminjaman?: string;
   akhir_peminjaman?: string;
+  akhirPerpanjangan?: string;
+  requestedPeriodeHari?: number;
   bukuJudul: string;
-  userLabel: string;
+  userId: string | null;
+  userName: string | null;
+};
+
+type ToastState = {
+  tone: "success" | "error";
+  message: string;
+};
+
+type ConfirmTransitionState = {
+  row: AdminLoanRow;
+  nextStatus: "DIPINJAM" | "DIKEMBALIKAN";
+  title: string;
+  description: string;
+  confirmLabel: string;
+  successMessage: string;
 };
 
 function mapAdminLoan(row: any): AdminLoanRow {
@@ -79,6 +165,16 @@ function mapAdminLoan(row: any): AdminLoanRow {
 
   const id = String(row?.id ?? row?.loanId ?? row?.peminjamanId ?? "-");
   const status = String(row?.status ?? "-");
+  const statusPerpanjangan =
+    typeof row?.status_perpanjangan === "string"
+      ? row.status_perpanjangan
+      : typeof row?.statusPerpanjangan === "string"
+        ? row.statusPerpanjangan
+        : undefined;
+  const catatan =
+    typeof row?.catatan === "string"
+      ? row.catatan.trim() || undefined
+      : undefined;
 
   const tanggal_peminjaman =
     toIsoDate(
@@ -89,23 +185,73 @@ function mapAdminLoan(row: any): AdminLoanRow {
     toIsoDate(row?.akhir_peminjaman ?? row?.jatuhTempo ?? row?.end_date) ||
     undefined;
 
+  const akhirPerpanjangan =
+    toIsoDate(row?.akhir_perpanjangan ?? row?.akhirPerpanjangan) || undefined;
+
+  const requestedPeriodeHari =
+    parseRequestedPeriodeHari(
+      row?.periode_hari ??
+        row?.periodeHari ??
+        row?.durasi_hari ??
+        row?.durasiHari ??
+        row?.hari_pengajuan ??
+        row?.hariPengajuan,
+    ) ??
+    computePeriodeFromDates(tanggal_peminjaman, akhir_peminjaman) ??
+    undefined;
+
   const bukuJudul =
     pickFirstString(buku, ["judul", "title", "nama"]) ??
     pickFirstString(row, ["judul", "title"]) ??
     "(Tanpa judul)";
 
-  const userLabel =
-    pickFirstString(user, ["nama_lengkap", "namaLengkap", "name", "email"]) ??
-    pickFirstString(row, ["user_email", "email"]) ??
-    String(row?.userId ?? row?.user_id ?? "-");
+  const userId =
+    pickFirstString(user, ["id", "userId", "user_id"]) ??
+    pickFirstString(row, [
+      "userId",
+      "user_id",
+      "peminjamId",
+      "peminjam_id",
+      "borrowerId",
+      "borrower_id",
+    ]) ??
+    (typeof row?.user === "string" ? row.user : undefined) ??
+    (typeof row?.peminjam === "string" ? row.peminjam : undefined) ??
+    null;
+
+  const userName =
+    pickFirstString(user, [
+      "nama_lengkap",
+      "namaLengkap",
+      "full_name",
+      "fullName",
+      "name",
+      "username",
+      "email",
+    ]) ??
+    pickFirstString(row, [
+      "nama_lengkap",
+      "namaLengkap",
+      "user_name",
+      "user_username",
+      "username",
+      "user_email",
+      "email",
+    ]) ??
+    null;
 
   return {
     id,
     status,
+    statusPerpanjangan,
+    catatan,
     tanggal_peminjaman,
     akhir_peminjaman,
+    akhirPerpanjangan,
+    requestedPeriodeHari,
     bukuJudul,
-    userLabel,
+    userId,
+    userName,
   };
 }
 
@@ -119,6 +265,8 @@ export default function AdminBorrowedBookRequestsPage() {
   const [rows, setRows] = useState<AdminLoanRow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  const [userNameById, setUserNameById] = useState<Record<string, string>>({});
+
   const [page, setPage] = useState(1);
   const limit = 10;
   const [total, setTotal] = useState<number | undefined>(undefined);
@@ -129,6 +277,30 @@ export default function AdminBorrowedBookRequestsPage() {
   const [periodeHari, setPeriodeHari] = useState<number>(7);
   const [submitting, setSubmitting] = useState(false);
   const [approveError, setApproveError] = useState<string | null>(null);
+
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectMode, setRejectMode] = useState<"PINJAMAN" | "PERPANJANGAN">(
+    "PINJAMAN",
+  );
+  const [rejectRow, setRejectRow] = useState<AdminLoanRow | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
+  const [rejectError, setRejectError] = useState<string | null>(null);
+
+  const [mutatingId, setMutatingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const [confirmTransition, setConfirmTransition] =
+    useState<ConfirmTransitionState | null>(null);
+
+  function showToast(tone: ToastState["tone"], message: string) {
+    setToast({ tone, message });
+  }
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 3600);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   useEffect(() => {
     const t = localStorage.getItem("token");
@@ -156,6 +328,7 @@ export default function AdminBorrowedBookRequestsPage() {
 
     setIsLoading(true);
     setError(null);
+    setToast(null);
 
     try {
       const res = await fetchAdminPeminjamanBuku({
@@ -185,6 +358,40 @@ export default function AdminBorrowedBookRequestsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meLoading, token, isAdmin, page]);
 
+  useEffect(() => {
+    if (meLoading) return;
+    if (!token) return;
+    if (!isAdmin) return;
+
+    let cancelled = false;
+
+    // Fetch user list once so we can render names instead of UUIDs.
+    fetchAdminUsers({ token, limit: 500 })
+      .then((res) => {
+        if (cancelled) return;
+        const map: Record<string, string> = {};
+        for (const u of res.data ?? []) {
+          const label =
+            typeof u.nama_lengkap === "string" && u.nama_lengkap.trim()
+              ? u.nama_lengkap.trim()
+              : typeof u.username === "string" && u.username.trim()
+                ? u.username.trim()
+                : typeof u.email === "string" && u.email.trim()
+                  ? u.email.trim()
+                  : "";
+          if (label) map[u.id] = label;
+        }
+        setUserNameById(map);
+      })
+      .catch(() => {
+        // Ignore; we'll fall back to any name/email found on the loan row.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [meLoading, token, isAdmin]);
+
   const totalPages = useMemo(() => {
     if (typeof total === "number") return Math.max(1, Math.ceil(total / limit));
     return Math.max(1, Math.ceil(rows.length / limit));
@@ -212,10 +419,35 @@ export default function AdminBorrowedBookRequestsPage() {
     setApproveError(null);
 
     const initialTanggal = row.tanggal_peminjaman || toIsoDate(new Date());
+    const initialPeriode =
+      typeof row.requestedPeriodeHari === "number" &&
+      Number.isFinite(row.requestedPeriodeHari) &&
+      row.requestedPeriodeHari > 0
+        ? Math.trunc(row.requestedPeriodeHari)
+        : 7;
     setTanggalPinjam(initialTanggal);
-    setPeriodeHari(7);
+    setPeriodeHari(initialPeriode);
 
     setApproveOpen(true);
+  }
+
+  function openRejectModal(
+    row: AdminLoanRow,
+    mode: "PINJAMAN" | "PERPANJANGAN",
+  ) {
+    setRejectMode(mode);
+    setRejectRow(row);
+    setRejectReason("");
+    setRejectError(null);
+    setRejectOpen(true);
+  }
+
+  function closeRejectModal(force = false) {
+    if (rejectSubmitting && !force) return;
+    setRejectOpen(false);
+    setRejectRow(null);
+    setRejectError(null);
+    setRejectReason("");
   }
 
   async function approve() {
@@ -251,6 +483,168 @@ export default function AdminBorrowedBookRequestsPage() {
       setApproveError(getErrorMessage(e, "Gagal menyetujui peminjaman"));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function transitionStatus(
+    row: AdminLoanRow,
+    nextStatus: "DIPINJAM" | "DIKEMBALIKAN",
+    successMessage: string,
+  ) {
+    if (!token) return;
+
+    try {
+      setMutatingId(row.id);
+      setToast(null);
+
+      const response = await transitionPeminjamanStatusByAdmin({
+        token,
+        id: row.id,
+        status: nextStatus,
+      });
+
+      const updated = mapAdminLoan(response?.data ?? response);
+      setRows((current) =>
+        current.map((r) => (r.id === row.id ? { ...r, ...updated } : r)),
+      );
+      showToast("success", successMessage);
+    } catch (e) {
+      showToast(
+        "error",
+        getErrorMessage(e, "Gagal mengubah status peminjaman"),
+      );
+    } finally {
+      setMutatingId(null);
+      setConfirmTransition(null);
+    }
+  }
+
+  function openTransitionConfirm(
+    row: AdminLoanRow,
+    nextStatus: "DIPINJAM" | "DIKEMBALIKAN",
+  ) {
+    if (nextStatus === "DIPINJAM") {
+      setConfirmTransition({
+        row,
+        nextStatus,
+        title: "Konfirmasi Pengambilan Buku",
+        description:
+          "Pinjaman ini akan ditandai sebagai telah diambil oleh peminjam.",
+        confirmLabel: "Ya, Tandai Diambil",
+        successMessage: "Status berhasil diubah menjadi Diambil",
+      });
+      return;
+    }
+
+    setConfirmTransition({
+      row,
+      nextStatus,
+      title: "Konfirmasi Pengembalian Buku",
+      description:
+        "Pinjaman ini akan ditandai sebagai telah dikembalikan dan stok buku akan bertambah.",
+      confirmLabel: "Ya, Tandai Dikembalikan",
+      successMessage: "Status berhasil diubah menjadi Dikembalikan",
+    });
+  }
+
+  async function submitReject() {
+    if (!token || !rejectRow) return;
+    const reason = rejectReason.trim();
+    if (!reason) {
+      setRejectError("Alasan penolakan wajib diisi");
+      return;
+    }
+
+    try {
+      setRejectSubmitting(true);
+      setRejectError(null);
+      setToast(null);
+      setMutatingId(rejectRow.id);
+
+      if (rejectMode === "PINJAMAN") {
+        await updatePeminjamanBukuByAdmin({
+          token,
+          id: rejectRow.id,
+          status: "DITOLAK",
+          catatan: reason,
+        });
+
+        setRows((current) =>
+          current.map((r) =>
+            r.id === rejectRow.id
+              ? {
+                  ...r,
+                  status: "DITOLAK",
+                  catatan: reason,
+                }
+              : r,
+          ),
+        );
+      } else {
+        await tolakPerpanjanganByAdmin({
+          token,
+          id: rejectRow.id,
+          catatan: reason,
+        });
+
+        setRows((current) =>
+          current.map((r) =>
+            r.id === rejectRow.id
+              ? {
+                  ...r,
+                  statusPerpanjangan: "DITOLAK",
+                  catatan: reason,
+                }
+              : r,
+          ),
+        );
+      }
+
+      closeRejectModal(true);
+      showToast(
+        "success",
+        rejectMode === "PINJAMAN"
+          ? "Peminjaman berhasil ditolak"
+          : "Perpanjangan berhasil ditolak",
+      );
+    } catch (e) {
+      setRejectError(
+        getErrorMessage(
+          e,
+          rejectMode === "PINJAMAN"
+            ? "Gagal menolak peminjaman"
+            : "Gagal menolak perpanjangan",
+        ),
+      );
+    } finally {
+      setRejectSubmitting(false);
+      setMutatingId(null);
+    }
+  }
+
+  async function approvePerpanjangan(row: AdminLoanRow) {
+    if (!token) return;
+
+    try {
+      setMutatingId(row.id);
+      setToast(null);
+      await setujuiPerpanjanganByAdmin({ token, id: row.id });
+
+      setRows((current) =>
+        current.map((r) =>
+          r.id === row.id
+            ? {
+                ...r,
+                statusPerpanjangan: "DISETUJUI",
+              }
+            : r,
+        ),
+      );
+      showToast("success", "Perpanjangan berhasil disetujui");
+    } catch (e) {
+      showToast("error", getErrorMessage(e, "Gagal menyetujui perpanjangan"));
+    } finally {
+      setMutatingId(null);
     }
   }
 
@@ -344,7 +738,7 @@ export default function AdminBorrowedBookRequestsPage() {
                     <tr>
                       <th className="text-left font-semibold px-6 py-3">ID</th>
                       <th className="text-left font-semibold px-6 py-3">
-                        User
+                        Peminjam
                       </th>
                       <th className="text-left font-semibold px-6 py-3">
                         Buku
@@ -365,15 +759,44 @@ export default function AdminBorrowedBookRequestsPage() {
                   </thead>
                   <tbody className="divide-y">
                     {rows.map((r) => {
-                      const isPending =
-                        String(r.status).toUpperCase() === "DIAJUKAN";
+                      const normalizedStatus = normalizeStatus(r.status);
+                      const isPending = normalizedStatus === "DIAJUKAN";
+                      const isReturned = normalizedStatus === "DIKEMBALIKAN";
+                      const normalizedExt = String(
+                        r.statusPerpanjangan ?? "",
+                      ).toUpperCase();
+                      const extLabel =
+                        normalizedExt === "DIAJUKAN"
+                          ? "Diajukan"
+                          : normalizedExt === "DISETUJUI"
+                            ? "Disetujui"
+                            : normalizedExt === "DITOLAK"
+                              ? "Ditolak"
+                              : "";
+                      const extPending = normalizedExt === "DIAJUKAN";
+                      const showAlasanDitolak =
+                        Boolean(r.catatan) &&
+                        (normalizedStatus === "DITOLAK" ||
+                          normalizedExt === "DITOLAK");
+
+                      const canMarkPicked = normalizedStatus === "DISETUJUI";
+                      const canMarkReturned = normalizedStatus === "DIPINJAM";
+
+                      const resolvedUser =
+                        (r.userId ? userNameById[r.userId] : undefined) ??
+                        r.userName ??
+                        "-";
+                      const safeUser =
+                        isLikelyUuid(resolvedUser) || !resolvedUser.trim()
+                          ? "-"
+                          : resolvedUser;
                       return (
                         <tr key={r.id} className="hover:bg-slate-50">
                           <td className="px-6 py-4 whitespace-nowrap text-slate-700">
                             {r.id}
                           </td>
                           <td className="px-6 py-4 text-slate-700">
-                            {r.userLabel}
+                            {safeUser}
                           </td>
                           <td className="px-6 py-4">
                             <div className="font-semibold text-slate-900">
@@ -391,23 +814,108 @@ export default function AdminBorrowedBookRequestsPage() {
                               : "-"}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span
-                              className={[
-                                "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
-                                statusBadgeClass(r.status),
-                              ].join(" ")}
-                            >
-                              {statusLabel(r.status)}
-                            </span>
+                            <div className="flex flex-col items-start gap-2">
+                              <span
+                                className={[
+                                  "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
+                                  statusBadgeClass(normalizedStatus),
+                                ].join(" ")}
+                              >
+                                {statusLabel(normalizedStatus)}
+                              </span>
+
+                              {extLabel ? (
+                                <div className="text-xs text-slate-600 whitespace-normal break-words">
+                                  <span className="font-medium text-slate-900">
+                                    Perpanjangan:
+                                  </span>{" "}
+                                  {extLabel}
+                                  {r.akhirPerpanjangan ? (
+                                    <>
+                                      <span className="text-slate-400">
+                                        {" "}
+                                        ·{" "}
+                                      </span>
+                                      <span>
+                                        hingga {formatDate(r.akhirPerpanjangan)}
+                                      </span>
+                                    </>
+                                  ) : null}
+                                </div>
+                              ) : null}
+
+                              {showAlasanDitolak ? (
+                                <div className="text-xs text-rose-700 whitespace-normal break-words">
+                                  <span className="font-medium">
+                                    Alasan ditolak:
+                                  </span>{" "}
+                                  {r.catatan}
+                                </div>
+                              ) : null}
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {isPending ? (
+                            {extPending ? (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => void approvePerpanjangan(r)}
+                                  disabled={mutatingId === r.id}
+                                  className="inline-flex h-9 items-center rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Setujui Perpanjangan
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    openRejectModal(r, "PERPANJANGAN")
+                                  }
+                                  disabled={mutatingId === r.id}
+                                  className="inline-flex h-9 items-center rounded-lg bg-red-600 px-3 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Tolak Perpanjangan
+                                </button>
+                              </div>
+                            ) : isPending ? (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => openApproveModal(r)}
+                                  disabled={mutatingId === r.id}
+                                  className="inline-flex h-9 items-center rounded-lg bg-slate-900 px-3 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Setujui
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => openRejectModal(r, "PINJAMAN")}
+                                  disabled={mutatingId === r.id}
+                                  className="inline-flex h-9 items-center rounded-lg bg-red-600 px-3 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Tolak
+                                </button>
+                              </div>
+                            ) : canMarkPicked ? (
                               <button
                                 type="button"
-                                onClick={() => openApproveModal(r)}
-                                className="inline-flex h-9 items-center rounded-lg bg-slate-900 px-3 text-sm font-medium text-white hover:bg-slate-800"
+                                onClick={() =>
+                                  openTransitionConfirm(r, "DIPINJAM")
+                                }
+                                disabled={mutatingId === r.id}
+                                className="inline-flex h-9 items-center rounded-lg bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                               >
-                                Setujui
+                                Tandai Telah Diambil
+                              </button>
+                            ) : canMarkReturned ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openTransitionConfirm(r, "DIKEMBALIKAN")
+                                }
+                                disabled={mutatingId === r.id}
+                                className="inline-flex h-9 items-center rounded-lg bg-slate-700 px-3 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                Tandai Telah Dikembalikan
                               </button>
                             ) : (
                               <span className="text-slate-400">—</span>
@@ -530,6 +1038,178 @@ export default function AdminBorrowedBookRequestsPage() {
                   className="h-10 px-4 rounded-xl bg-slate-900 text-white font-medium hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submitting ? "Menyimpan…" : "Setujui"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {rejectOpen ? (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-6"
+            role="dialog"
+            aria-modal="true"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) closeRejectModal();
+            }}
+          >
+            <div className="w-full max-w-md rounded-2xl bg-white border p-6 shadow-lg">
+              <div className="text-lg font-semibold text-slate-900">
+                {rejectMode === "PINJAMAN"
+                  ? "Tolak Peminjaman"
+                  : "Tolak Perpanjangan"}
+              </div>
+
+              <p className="mt-2 text-sm text-slate-600">
+                Alasan penolakan ini akan ditampilkan ke pengguna di riwayat
+                peminjaman.
+              </p>
+
+              <ErrorMessage error={rejectError} className="mt-4" />
+
+              <div className="mt-4">
+                <label className="block text-sm text-slate-700 mb-2">
+                  Alasan Penolakan
+                </label>
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="Contoh: Buku sedang dalam perbaikan sehingga belum bisa dipinjam."
+                  rows={4}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-black"
+                  disabled={rejectSubmitting}
+                />
+              </div>
+
+              <div className="mt-6 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  className="h-10 px-4 rounded-xl border border-slate-300 bg-white text-slate-900 font-medium hover:bg-slate-50"
+                  onClick={() => closeRejectModal()}
+                  disabled={rejectSubmitting}
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void submitReject()}
+                  disabled={
+                    rejectSubmitting || !rejectRow || !rejectReason.trim()
+                  }
+                  className="h-10 px-4 rounded-xl bg-red-600 text-white font-medium hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {rejectSubmitting ? "Menyimpan…" : "Tolak"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {confirmTransition ? (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 px-6"
+            role="dialog"
+            aria-modal="true"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget && !mutatingId) {
+                setConfirmTransition(null);
+              }
+            }}
+          >
+            <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 inline-flex h-8 w-8 flex-none items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                  !
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">
+                    {confirmTransition.title}
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {confirmTransition.description}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  className="h-10 px-4 rounded-xl border border-slate-300 bg-white text-slate-900 font-medium hover:bg-slate-50"
+                  onClick={() => setConfirmTransition(null)}
+                  disabled={Boolean(mutatingId)}
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void transitionStatus(
+                      confirmTransition.row,
+                      confirmTransition.nextStatus,
+                      confirmTransition.successMessage,
+                    )
+                  }
+                  disabled={Boolean(mutatingId)}
+                  className="h-10 px-4 rounded-xl bg-slate-900 text-white font-medium hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {mutatingId ? "Menyimpan…" : confirmTransition.confirmLabel}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {toast ? (
+          <div className="fixed right-6 top-6 z-[70] w-full max-w-sm">
+            <div
+              className={[
+                "rounded-2xl border px-4 py-3 shadow-xl backdrop-blur-sm",
+                toast.tone === "success"
+                  ? "border-emerald-200 bg-emerald-50/95"
+                  : "border-rose-200 bg-rose-50/95",
+              ].join(" ")}
+              role="status"
+              aria-live="polite"
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className={[
+                    "mt-0.5 inline-flex h-6 w-6 flex-none items-center justify-center rounded-full text-xs font-bold",
+                    toast.tone === "success"
+                      ? "bg-emerald-600 text-white"
+                      : "bg-rose-600 text-white",
+                  ].join(" ")}
+                >
+                  {toast.tone === "success" ? "✓" : "!"}
+                </div>
+                <div className="flex-1">
+                  <p
+                    className={[
+                      "text-sm font-medium",
+                      toast.tone === "success"
+                        ? "text-emerald-900"
+                        : "text-rose-900",
+                    ].join(" ")}
+                  >
+                    {toast.tone === "success" ? "Berhasil" : "Terjadi Kendala"}
+                  </p>
+                  <p
+                    className={[
+                      "mt-0.5 text-sm",
+                      toast.tone === "success"
+                        ? "text-emerald-800"
+                        : "text-rose-800",
+                    ].join(" ")}
+                  >
+                    {toast.message}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setToast(null)}
+                  className="rounded-md px-2 py-1 text-xs font-medium text-slate-500 hover:bg-white/70 hover:text-slate-700"
+                >
+                  Tutup
                 </button>
               </div>
             </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { API_URL } from "@/app/lib/api";
@@ -21,9 +22,7 @@ function getRole(me: any): string | undefined {
 }
 
 function getDisplayName(me: any): string | undefined {
-  const raw =
-    me?.nama_lengkap ??
-    undefined;
+  const raw = me?.nama_lengkap ?? undefined;
 
   if (typeof raw !== "string") return undefined;
   const trimmed = raw.trim();
@@ -32,6 +31,12 @@ function getDisplayName(me: any): string | undefined {
 
 export default function Navbar({ items }: NavbarProps) {
   const pathname = usePathname();
+
+  const isLoginPage = pathname === "/auth/login";
+  const isRegisterPage = pathname === "/auth/register";
+  const isKunjunganPage = pathname === "/kunjungan";
+
+  const useTransparentStyle = isLoginPage || isRegisterPage || isKunjunganPage;
 
   const [adminOpen, setAdminOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
@@ -43,18 +48,20 @@ export default function Navbar({ items }: NavbarProps) {
   const userRef = useRef<HTMLDivElement>(null);
 
   const [isAuthed, setIsAuthed] = useState<boolean>(false);
-
   const [me, setMe] = useState<any>(null);
-
-  const navItems: NavbarItem[] = items ?? [
-    { label: "Beranda", href: "/" },
-    { label: "Koleksi", href: "/koleksi" },
-    { label: "Isi Buku Tamu", href: "#", disabled: true },
-  ];
 
   const role = getRole(me);
   const isAdmin = role === "admin";
   const displayName = getDisplayName(me) ?? "Akun";
+
+  const navItems: NavbarItem[] = items ?? [
+    { label: "Beranda", href: "/" },
+    { label: "Koleksi", href: "/koleksi" },
+    ...(isAuthed && role === "mahasiswa"
+      ? [{ label: "Lihat Skripsi", href: "/skripsi" }]
+      : []),
+    ...(!isAdmin ? [{ label: "Isi Buku Tamu", href: "/kunjungan" }] : []),
+  ];
 
   function cancelAdminClose() {
     if (adminCloseTimer.current != null) {
@@ -164,27 +171,91 @@ export default function Navbar({ items }: NavbarProps) {
       if (e.key === "token") verify();
     }
 
+    function onProfileUpdated() {
+      verify();
+    }
+
     window.addEventListener("storage", onStorage);
+    window.addEventListener("profile-updated", onProfileUpdated);
+
     return () => {
       cancelled = true;
       window.removeEventListener("storage", onStorage);
+      window.removeEventListener("profile-updated", onProfileUpdated);
     };
   }, [items, pathname]);
 
   return (
-    <header className="w-full bg-white border-b">
+    <header
+      className={[
+        "w-full",
+        useTransparentStyle
+          ? "absolute top-0 left-0 z-50 bg-transparent border-b border-transparent"
+          : "bg-white border-b",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
       <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
-        <div className="text-lg font-semibold text-slate-900">eLib</div>
+        <Link href="/" className="flex items-center gap-3">
+          <div className="relative h-10 w-10 overflow-hidden rounded-full border border-slate-200 bg-white/90 shadow-sm">
+            <Image
+              src="/logo-polisi.png"
+              alt="Logo STIK"
+              fill
+              sizes="40px"
+              className="object-contain p-1"
+              priority
+            />
+          </div>
+          <div className="flex flex-col leading-tight">
+            <span
+              className={[
+                "text-xs font-semibold uppercase tracking-[0.16em]",
+                useTransparentStyle ? "text-white/80" : "text-slate-500",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              E-Library
+            </span>
+            <span
+              className={[
+                "text-sm font-bold sm:text-base",
+                useTransparentStyle ? "text-white" : "text-slate-900",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              Sekolah Tinggi Ilmu Kepolisian
+            </span>
+          </div>
+        </Link>
 
-        <nav className="flex items-center gap-8 text-sm text-slate-700">
+        <nav
+          className={[
+            "flex items-center gap-8 text-sm",
+            useTransparentStyle ? "text-white/90" : "text-slate-700",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
           {navItems.map((item) => {
             const isActive = item.href !== "#" && pathname === item.href;
             const className = [
               "transition-colors",
               item.disabled
-                ? "text-slate-400 cursor-not-allowed"
-                : "hover:text-slate-900",
-              isActive ? "text-slate-900 font-semibold" : "",
+                ? useTransparentStyle
+                  ? "text-white/40 cursor-not-allowed"
+                  : "text-slate-400 cursor-not-allowed"
+                : useTransparentStyle
+                  ? "hover:text-white"
+                  : "hover:text-slate-900",
+              isActive
+                ? useTransparentStyle
+                  ? "text-white font-semibold"
+                  : "text-slate-900 font-semibold"
+                : "",
             ]
               .filter(Boolean)
               .join(" ");
@@ -246,6 +317,13 @@ export default function Navbar({ items }: NavbarProps) {
                       Riwayat Login Pengguna
                     </Link>
                     <Link
+                      href="/admin/landing-content"
+                      className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                      onClick={() => setAdminOpen(false)}
+                    >
+                      Kelola Antarmuka
+                    </Link>
+                    <Link
                       href="/admin/users"
                       className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
                       onClick={() => setAdminOpen(false)}
@@ -259,6 +337,13 @@ export default function Navbar({ items }: NavbarProps) {
                     >
                       Peminjaman Buku
                     </Link>
+                    <Link
+                      href="/admin/books"
+                      className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                      onClick={() => setAdminOpen(false)}
+                    >
+                      Tambah Buku
+                    </Link>
                   </div>
                 </>
               ) : null}
@@ -268,7 +353,14 @@ export default function Navbar({ items }: NavbarProps) {
           {!isAuthed ? (
             <Link
               href="/auth/login"
-              className="transition-colors hover:text-slate-900"
+              className={[
+                "transition-colors",
+                useTransparentStyle
+                  ? "hover:text-white"
+                  : "hover:text-slate-900",
+              ]
+                .filter(Boolean)
+                .join(" ")}
             >
               Masuk
             </Link>

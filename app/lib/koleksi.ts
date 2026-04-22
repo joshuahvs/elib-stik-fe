@@ -29,6 +29,8 @@ export interface BukuRow {
   issn_or_isbn?: string | null;
   issn?: string | null;
   abstrak?: string | null;
+  sinopsis?: string | null;
+  jumlah_eksemplar?: number | null;
   kata_kunci?: string | null;
   kode_bahasa?: string | null;
   frekuensi_terbit?: string | null;
@@ -63,14 +65,25 @@ export async function fetchKoleksi(opts: {
   keyword?: string;
   page?: number;
   limit?: number;
+  category?: string;
+  tahun?: string | number;
+  subjek?: string | string[];
 }): Promise<KoleksiResponse> {
-  const query = buildQuery({
-    q: opts.keyword,
-    page: opts.page,
-    limit: opts.limit,
-  });
+  const qs = new URLSearchParams();
+  
+  if (opts.keyword) qs.set('q', opts.keyword);
+  if (opts.page) qs.set('page', String(opts.page));
+  if (opts.limit) qs.set('limit', String(opts.limit));
+  if (opts.category) qs.set('category', opts.category);
+  if (opts.tahun) qs.set('tahun', String(opts.tahun));
+  
+  // Handle multiple subjek values
+  if (opts.subjek) {
+    const subjekArray = Array.isArray(opts.subjek) ? opts.subjek : [opts.subjek];
+    subjekArray.forEach((s) => qs.append('subjek', s));
+  }
 
-  const res = await fetch(`${API_URL}/koleksi/search?${query}`);
+  const res = await fetch(`${API_URL}/koleksi/search?${qs.toString()}`);
 
   if (!res.ok) {
     throw new Error(`Fetch failed: ${res.status}`);
@@ -93,3 +106,44 @@ export async function fetchBukuById(id: string): Promise<BukuRow | null> {
   const json = await res.json();
   return json.data ?? null;
 }
+
+export async function fetchKoleksiCategories(): Promise<{ data: string[] }> {
+  const res = await fetch(`${API_URL}/koleksi/categories`);
+
+  if (!res.ok) {
+    throw new Error(`Fetch failed: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+export async function fetchKoleksiYears(): Promise<{ data: number[] }> {
+  const res = await fetch(`${API_URL}/koleksi/years`);
+
+  if (!res.ok) {
+    throw new Error(`Fetch failed: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+export async function fetchKoleksiSubjects(): Promise<{ data: Record<string, any[]> }> {
+  const res = await fetch(`${API_URL}/koleksi/subjects`);
+
+  if (!res.ok) {
+    throw new Error(`Fetch failed: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+export async function fetchKoleksiSubjectsAll(): Promise<{ data: any[] }> {
+  const res = await fetch(`${API_URL}/koleksi/subjects-all`);
+
+  if (!res.ok) {
+    throw new Error(`Fetch failed: ${res.status}`);
+  }
+
+  return res.json();
+}
+

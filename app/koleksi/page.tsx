@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { fetchKoleksi, type BukuRow } from "@/app/lib/koleksi";
+import KoleksiFilter from "./components/KoleksiFilter";
 
 const PER_PAGE = 12;
 
@@ -15,9 +16,6 @@ const cleanText = (text: string | null): string => {
 const FALLBACK_COVER =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='533' fill='%23f1f5f9'%3E%3Crect width='400' height='533'/%3E%3Ctext x='50%25' y='45%25' text-anchor='middle' fill='%2394a3b8' font-family='sans-serif' font-size='48' font-weight='700' dy='.3em'%3EImage Not%3C/text%3E%3Ctext x='50%25' y='55%25' text-anchor='middle' fill='%2394a3b8' font-family='sans-serif' font-size='48' font-weight='700' dy='.3em'%3EAvailable%3C/text%3E%3C/svg%3E";
 
-const TAHUN_OPTIONS = ["Semua", "2024", "2023", "2022", "2021", "2020", "2019", "2018"];
-const SUBJEK_OPTIONS = ["Semua", "Hukum", "Manajemen", "Psikologi", "Kriminologi", "Kepemimpinan"];
-
 export default function KoleksiPage() {
   const [searchInput, setSearchInput] = useState("");
   const [keyword, setKeyword] = useState("");
@@ -27,30 +25,41 @@ export default function KoleksiPage() {
   const [totalData, setTotalData] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
-  // UI-only filter state (no backend wiring yet)
+  // Filter state
+  const [filterKategori, setFilterKategori] = useState("");
   const [filterKetersediaan, setFilterKetersediaan] = useState("Semua");
   const [filterTahun, setFilterTahun] = useState("Semua");
-  const [filterSubjek, setFilterSubjek] = useState("Semua");
+  const [filterSubjeks, setFilterSubjeks] = useState<string[]>([]);
 
-  const loadData = useCallback(async (kw: string, pg: number) => {
-    setIsLoading(true);
-    try {
-      const res = await fetchKoleksi({ keyword: kw || undefined, page: pg, limit: PER_PAGE });
-      setRows(res.data);
-      setTotalPages(res.meta.total_pages);
-      setTotalData(res.meta.total_data);
-    } catch {
-      setRows([]);
-      setTotalPages(0);
-      setTotalData(0);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const loadData = useCallback(
+    async (kw: string, pg: number, kategori: string, tahun: string, subjeks: string[]) => {
+      setIsLoading(true);
+      try {
+        const res = await fetchKoleksi({
+          keyword: kw || undefined,
+          page: pg,
+          limit: PER_PAGE,
+          category: kategori || undefined,
+          tahun: tahun !== "Semua" ? tahun : undefined,
+          subjek: subjeks.length > 0 ? subjeks : undefined,
+        });
+        setRows(res.data);
+        setTotalPages(res.meta.total_pages);
+        setTotalData(res.meta.total_data);
+      } catch {
+        setRows([]);
+        setTotalPages(0);
+        setTotalData(0);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
-    loadData(keyword, page);
-  }, [keyword, page, loadData]);
+    loadData(keyword, page, filterKategori, filterTahun, filterSubjeks);
+  }, [keyword, page, filterKategori, filterTahun, filterSubjeks, loadData]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -58,8 +67,35 @@ export default function KoleksiPage() {
     setKeyword(searchInput.trim());
   }
 
-  const selectClass =
-    "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-[#6b3a22] focus:ring-2 focus:ring-[#6b3a22]/20 cursor-pointer";
+  function handleCategoryChange(category: string) {
+    setFilterKategori(category);
+    setPage(1);
+  }
+
+  function handleTahunChange(tahun: string) {
+    setFilterTahun(tahun);
+    setPage(1);
+  }
+
+  function handleSubjekChange(subjek: string) {
+    // Toggle subjek selection (add or remove)
+    setFilterSubjeks((prev) => {
+      if (prev.includes(subjek)) {
+        return prev.filter((s) => s !== subjek);
+      } else {
+        return [...prev, subjek];
+      }
+    });
+    setPage(1);
+  }
+
+  function handleResetFilters() {
+    setFilterKategori("");
+    setFilterKetersediaan("Semua");
+    setFilterTahun("Semua");
+    setFilterSubjeks([]);
+    setPage(1);
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
@@ -109,76 +145,18 @@ export default function KoleksiPage() {
       </div>
 
       <main className="mx-auto max-w-6xl px-6 py-8">
-        {/* Filter Bar */}
-        <div className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="mr-1 text-xs font-semibold uppercase tracking-widest text-slate-400">
-            Filter
-          </p>
-
-          {/* Ketersediaan */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">Ketersediaan</label>
-            <select
-              value={filterKetersediaan}
-              onChange={(e) => setFilterKetersediaan(e.target.value)}
-              className={selectClass}
-            >
-              {["Semua", "Tersedia", "Dipinjam"].map((opt) => (
-                <option key={opt}>{opt}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Tahun Terbit */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">Tahun Terbit</label>
-            <select
-              value={filterTahun}
-              onChange={(e) => setFilterTahun(e.target.value)}
-              className={selectClass}
-            >
-              {TAHUN_OPTIONS.map((opt) => (
-                <option key={opt}>{opt}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Subjek */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-500">Subjek</label>
-            <select
-              value={filterSubjek}
-              onChange={(e) => setFilterSubjek(e.target.value)}
-              className={selectClass}
-            >
-              {SUBJEK_OPTIONS.map((opt) => (
-                <option key={opt}>{opt}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Active filter pills */}
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            {filterKetersediaan !== "Semua" && (
-              <span className="flex items-center gap-1 rounded-full bg-[#6b3a22]/10 px-3 py-1 text-xs font-medium text-[#6b3a22]">
-                {filterKetersediaan}
-                <button onClick={() => setFilterKetersediaan("Semua")} className="ml-1 leading-none hover:text-[#6b3a22]/70">×</button>
-              </span>
-            )}
-            {filterTahun !== "Semua" && (
-              <span className="flex items-center gap-1 rounded-full bg-[#6b3a22]/10 px-3 py-1 text-xs font-medium text-[#6b3a22]">
-                {filterTahun}
-                <button onClick={() => setFilterTahun("Semua")} className="ml-1 leading-none hover:text-[#6b3a22]/70">×</button>
-              </span>
-            )}
-            {filterSubjek !== "Semua" && (
-              <span className="flex items-center gap-1 rounded-full bg-[#6b3a22]/10 px-3 py-1 text-xs font-medium text-[#6b3a22]">
-                {filterSubjek}
-                <button onClick={() => setFilterSubjek("Semua")} className="ml-1 leading-none hover:text-[#6b3a22]/70">×</button>
-              </span>
-            )}
-          </div>
-        </div>
+        {/* Filter Bar Component */}
+        <KoleksiFilter
+          selectedCategory={filterKategori}
+          onCategoryChange={handleCategoryChange}
+          selectedKetersediaan={filterKetersediaan}
+          onKetersediaanChange={setFilterKetersediaan}
+          selectedTahun={filterTahun}
+          onTahunChange={handleTahunChange}
+          selectedSubjeks={filterSubjeks}
+          onSubjekChange={handleSubjekChange}
+          onResetFilters={handleResetFilters}
+        />
 
         {/* Result count */}
         {!isLoading && rows.length > 0 && (

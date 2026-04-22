@@ -38,6 +38,9 @@ export async function fetchRiwayatPeminjamanMe(opts: {
   token: string;
   page?: number;
   limit?: number;
+  status?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }): Promise<ListRiwayatMeResult> {
   const page = Math.max(1, Math.trunc(opts.page ?? 1));
   const limit = Math.min(100, Math.max(1, Math.trunc(opts.limit ?? 10)));
@@ -45,6 +48,10 @@ export async function fetchRiwayatPeminjamanMe(opts: {
   const url = new URL(`${API_URL}/peminjaman-buku/me/riwayat`);
   url.searchParams.set("page", String(page));
   url.searchParams.set("limit", String(limit));
+  
+  if (opts.status) url.searchParams.set("status", opts.status);
+  if (opts.sortBy) url.searchParams.set("sortBy", opts.sortBy);
+  if (opts.sortOrder) url.searchParams.set("sortOrder", opts.sortOrder);
 
   const res = await fetch(url.toString(), {
     method: "GET",
@@ -177,6 +184,10 @@ export async function updatePeminjamanBukuByAdmin(opts: {
   status: string;
   tanggal_peminjaman?: string;
   akhir_peminjaman?: string;
+  tanggal_pengembalian?: string;
+  status_perpanjangan?: string;
+  akhir_perpanjangan?: string;
+  catatan?: string;
 }): Promise<any> {
   const res = await fetch(`${API_URL}/peminjaman-buku/${encodeURIComponent(opts.id)}`, {
     method: "PATCH",
@@ -189,12 +200,106 @@ export async function updatePeminjamanBukuByAdmin(opts: {
       status: opts.status,
       tanggal_peminjaman: opts.tanggal_peminjaman,
       akhir_peminjaman: opts.akhir_peminjaman,
+      tanggal_pengembalian: opts.tanggal_pengembalian,
+      status_perpanjangan: opts.status_perpanjangan,
+      akhir_perpanjangan: opts.akhir_perpanjangan,
+      catatan: opts.catatan,
     }),
   });
 
   const { data, textBody } = await parseJsonOrText(res);
   if (!res.ok) {
     const msg = pickErrorMessage(data, textBody, "Gagal memperbarui peminjaman");
+    throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+  }
+
+  return data;
+}
+
+export async function transitionPeminjamanStatusByAdmin(opts: {
+  token: string;
+  id: string;
+  status: string;
+  catatan?: string;
+}): Promise<any> {
+  const res = await fetch(
+    `${API_URL}/peminjaman-buku/${encodeURIComponent(opts.id)}/status`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${opts.token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        status: opts.status,
+        catatan: opts.catatan,
+      }),
+    },
+  );
+
+  const { data, textBody } = await parseJsonOrText(res);
+  if (!res.ok) {
+    const msg = pickErrorMessage(
+      data,
+      textBody,
+      "Gagal mengubah status peminjaman",
+    );
+    throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+  }
+
+  return data;
+}
+
+export async function setujuiPerpanjanganByAdmin(opts: {
+  token: string;
+  id: string;
+}): Promise<any> {
+  const res = await fetch(
+    `${API_URL}/peminjaman-buku/${encodeURIComponent(opts.id)}/perpanjangan/setujui`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${opts.token}`,
+        Accept: "application/json",
+      },
+    },
+  );
+
+  const { data, textBody } = await parseJsonOrText(res);
+  if (!res.ok) {
+    const msg = pickErrorMessage(
+      data,
+      textBody,
+      "Gagal menyetujui perpanjangan",
+    );
+    throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+  }
+
+  return data;
+}
+
+export async function tolakPerpanjanganByAdmin(opts: {
+  token: string;
+  id: string;
+  catatan?: string;
+}): Promise<any> {
+  const res = await fetch(
+    `${API_URL}/peminjaman-buku/${encodeURIComponent(opts.id)}/perpanjangan/tolak`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${opts.token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ catatan: opts.catatan }),
+    },
+  );
+
+  const { data, textBody } = await parseJsonOrText(res);
+  if (!res.ok) {
+    const msg = pickErrorMessage(data, textBody, "Gagal menolak perpanjangan");
     throw new Error(`${res.status} ${res.statusText}: ${msg}`);
   }
 
@@ -241,4 +346,55 @@ export async function ajukanPeminjamanBuku(opts: {
   }
 
   return data;
+}
+
+export async function ajukanPerpanjanganPeminjaman(opts: {
+  token: string;
+  loanId: string;
+  durasiHari: number;
+}): Promise<any> {
+  const durasiHari = Math.max(1, Math.min(30, Math.trunc(opts.durasiHari)));
+
+  const endpoint = `${API_URL}/peminjaman-buku/${encodeURIComponent(opts.loanId)}/perpanjangan`;
+  const candidates: Array<{ url: string; method: "PATCH" | "POST" }> = [
+    { url: endpoint, method: "PATCH" },
+    { url: endpoint, method: "POST" },
+  ];
+
+  let lastError: Error | null = null;
+
+  for (const candidate of candidates) {
+    try {
+      const res = await fetch(candidate.url, {
+        method: candidate.method,
+        headers: {
+          Authorization: `Bearer ${opts.token}`,
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ durasiHari }),
+      });
+
+      const { data, textBody } = await parseJsonOrText(res);
+
+      if (!res.ok) {
+        const msg = pickErrorMessage(
+          data,
+          textBody,
+          "Gagal mengajukan perpanjangan",
+        );
+        lastError = new Error(`${res.status} ${res.statusText}: ${msg}`);
+        continue;
+      }
+
+      return data;
+    } catch (e) {
+      lastError =
+        e instanceof Error
+          ? e
+          : new Error("Gagal mengajukan perpanjangan");
+    }
+  }
+
+  throw lastError ?? new Error("Gagal mengajukan perpanjangan");
 }
