@@ -153,7 +153,7 @@
 
 "use client";
 
-import { type ChangeEvent, useState } from "react";
+import { Suspense, type ChangeEvent, useState } from "react";
 import { API_URL } from "@/app/lib/api";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -163,6 +163,36 @@ import ErrorMessage, { getErrorMessage } from "@/app/components/ErrorMessage";
 import { Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen">
+          <main className="relative min-h-screen">
+            <div className="absolute inset-0 bg-[url('/bg-3.png')] bg-cover bg-center" />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/55 to-black/10" />
+
+            <div className="relative min-h-screen grid grid-cols-1 md:grid-cols-2">
+              <section className="hidden md:block" aria-hidden="true" />
+
+              <section className="min-h-screen flex items-center justify-center px-6 py-10 pt-24">
+                <div className="w-full max-w-md">
+                  <h1 className="text-3xl md:text-4xl font-bold text-white mb-6">
+                    Masuk
+                  </h1>
+                  <p className="text-white/80">Memproses…</p>
+                </div>
+              </section>
+            </div>
+          </main>
+        </div>
+      }
+    >
+      <LoginPageInner />
+    </Suspense>
+  );
+}
+
+function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
