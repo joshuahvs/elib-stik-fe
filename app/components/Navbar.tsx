@@ -53,15 +53,14 @@ export default function Navbar({ items }: NavbarProps) {
   const isAdmin = role === "admin";
   const displayName = getDisplayName(me) ?? "Akun";
 
-  const navItems: NavbarItem[] =
-    items ??
-    [
-      { label: "Beranda", href: "/" },
-      { label: "Koleksi", href: "/koleksi" },
-      ...(!isAdmin
-        ? [{ label: "Isi Buku Tamu", href: "/kunjungan" }]
-        : []),
-    ];
+  const navItems: NavbarItem[] = items ?? [
+    { label: "Beranda", href: "/" },
+    { label: "Koleksi", href: "/koleksi" },
+    ...(isAuthed && role === "mahasiswa"
+      ? [{ label: "Lihat Skripsi", href: "/skripsi" }]
+      : []),
+    ...(!isAdmin ? [{ label: "Isi Buku Tamu", href: "/kunjungan" }] : []),
+  ];
 
   function cancelAdminClose() {
     if (adminCloseTimer.current != null) {
@@ -313,6 +312,13 @@ export default function Navbar({ items }: NavbarProps) {
                     >
                       Peminjaman Buku
                     </Link>
+                    <Link
+                      href="/admin/books"
+                      className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                      onClick={() => setAdminOpen(false)}
+                    >
+                      Tambah Buku
+                    </Link>
                   </div>
                 </>
               ) : null}
@@ -324,7 +330,9 @@ export default function Navbar({ items }: NavbarProps) {
               href="/auth/login"
               className={[
                 "transition-colors",
-                useTransparentStyle ? "hover:text-white" : "hover:text-slate-900",
+                useTransparentStyle
+                  ? "hover:text-white"
+                  : "hover:text-slate-900",
               ]
                 .filter(Boolean)
                 .join(" ")}

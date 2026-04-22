@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/css";
 import "swiper/css/navigation";
@@ -20,26 +21,24 @@ export default function ArticlesSlider({ articles }: any) {
     >
       {articles.map((item: any) => (
         <SwiperSlide key={item.id}>
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-
+          <Link
+            href={`/articles/${item.id}`}
+            className="group block bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-200"
+          >
             <img
               src={item.url_sampul}
-              className="h-48 w-full object-cover"
+              className="h-48 w-full object-cover group-hover:scale-105 transition-transform duration-300"
+              alt={item.judul}
             />
-
             <div className="p-6">
-
-              <h3 className="font-semibold text-lg mb-2">
+              <h3 className="font-semibold text-lg mb-2 group-hover:text-[#512F16] transition">
                 {item.judul}
               </h3>
-
               <p className="text-xs text-gray-400">
                 {item.tahun_terbit}
               </p>
-
             </div>
-
-          </div>
+          </Link>
         </SwiperSlide>
       ))}
     </Swiper>
