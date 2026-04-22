@@ -10,6 +10,7 @@ import {
   tolakPerpanjanganByAdmin,
   updatePeminjamanBukuByAdmin,
 } from "@/app/lib/peminjamanBuku";
+import Dropdown from "@/app/components/DropDown";
 import ErrorMessage, { getErrorMessage } from "@/app/components/ErrorMessage";
 
 function getRole(me: any): string | undefined {
@@ -65,6 +66,18 @@ function statusLabel(statusRaw: any): string {
   if (s === "DIPINJAM" || s === "DIAMBIL") return "Diambil";
   if (s === "DIKEMBALIKAN") return "Dikembalikan";
   return String(statusRaw ?? "-");
+}
+
+function statusFromLabel(label: string): string {
+  const s = String(label ?? "")
+    .trim()
+    .toUpperCase();
+  if (s === "DISETUJUI") return "DISETUJUI";
+  if (s === "DIAMBIL" || s === "DIPINJAM") return "DIPINJAM";
+  if (s === "DIKEMBALIKAN") return "DIKEMBALIKAN";
+  if (s === "DITOLAK") return "DITOLAK";
+  if (s === "DIAJUKAN") return "DIAJUKAN";
+  return s;
 }
 
 function statusBadgeClass(statusRaw: any): string {
@@ -773,63 +786,41 @@ export default function AdminBorrowedBookRequestsPage() {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex flex-col items-start gap-2">
                               {canEditStatus ? (
-                                <div className="relative inline-flex">
-                                  <select
-                                    value={normalizedStatus}
-                                    onChange={(e) => {
-                                      const next = String(e.target.value);
+                                <div className="w-44">
+                                  <Dropdown
+                                    label="Status"
+                                    labelClassName="sr-only"
+                                    value={statusLabel(normalizedStatus)}
+                                    options={
+                                      normalizedStatus === "DISETUJUI"
+                                        ? [
+                                            statusLabel("DISETUJUI"),
+                                            statusLabel("DIPINJAM"),
+                                            statusLabel("DIKEMBALIKAN"),
+                                          ]
+                                        : [
+                                            statusLabel("DIPINJAM"),
+                                            statusLabel("DIKEMBALIKAN"),
+                                          ]
+                                    }
+                                    onChange={(label) => {
+                                      if (mutatingId === r.id) return;
+                                      const next = statusFromLabel(label);
                                       void setStatus({
                                         rowId: r.id,
                                         prevStatus: normalizedStatus,
                                         nextStatus: next,
                                       });
                                     }}
-                                    disabled={mutatingId === r.id}
-                                    className={[
-                                      "h-7 rounded-full pl-3 pr-8 text-xs font-medium",
-                                      "appearance-none",
-                                      "focus:outline-none focus:ring-2 focus:ring-slate-200",
+                                    buttonClassName={[
+                                      "!rounded-full !px-3 !py-1.5 !text-xs !font-medium !min-h-0",
                                       statusBadgeClass(normalizedStatus),
                                       mutatingId === r.id
-                                        ? "opacity-60 cursor-not-allowed"
-                                        : "cursor-pointer",
+                                        ? "opacity-60 pointer-events-none"
+                                        : "",
                                     ].join(" ")}
-                                  >
-                                    {normalizedStatus === "DISETUJUI" ? (
-                                      <>
-                                        <option value="DISETUJUI">
-                                          {statusLabel("DISETUJUI")}
-                                        </option>
-                                        <option value="DIPINJAM">
-                                          {statusLabel("DIPINJAM")}
-                                        </option>
-                                        <option value="DIKEMBALIKAN">
-                                          {statusLabel("DIKEMBALIKAN")}
-                                        </option>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <option value="DIPINJAM">
-                                          {statusLabel("DIPINJAM")}
-                                        </option>
-                                        <option value="DIKEMBALIKAN">
-                                          {statusLabel("DIKEMBALIKAN")}
-                                        </option>
-                                      </>
-                                    )}
-                                  </select>
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    viewBox="0 0 20 20"
-                                    fill="currentColor"
-                                    className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 opacity-80"
-                                  >
-                                    <path
-                                      fillRule="evenodd"
-                                      d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.24 4.5a.75.75 0 01-1.08 0l-4.24-4.5a.75.75 0 01.02-1.06z"
-                                      clipRule="evenodd"
-                                    />
-                                  </svg>
+                                    valueClassName="!text-white"
+                                  />
                                 </div>
                               ) : (
                                 <span
