@@ -16,9 +16,15 @@ export default function InputField({
   disabled,
   ...props
 }: InputFieldProps) {
+  const isRequiredLabel = typeof label === "string" && /\*\s*$/.test(label);
+  const normalizedLabel =
+    typeof label === "string" ? label.replace(/\s*\*\s*$/, "").trim() : label;
+
   const inputId =
     id ??
-    (label ? String(label).toLowerCase().replace(/\s+/g, "-") : undefined);
+    (typeof normalizedLabel === "string" && normalizedLabel
+      ? normalizedLabel.toLowerCase().replace(/\s+/g, "-")
+      : undefined);
 
   const isDisabled = Boolean(disabled);
   const isReadOnly = Boolean(readOnly) && !isDisabled;
@@ -30,13 +36,13 @@ export default function InputField({
           htmlFor={inputId}
           className={[
             "block text-sm mb-2",
-            labelClassName ??
-              (isDisabled ? "text-slate-500" : "text-black"),
+            labelClassName ?? (isDisabled ? "text-slate-500" : "text-black"),
           ]
             .filter(Boolean)
             .join(" ")}
         >
-          {label}
+          {normalizedLabel}
+          {isRequiredLabel ? <span className="text-rose-600"> *</span> : null}
         </label>
       ) : null}
 
