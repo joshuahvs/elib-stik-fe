@@ -38,6 +38,9 @@ export async function fetchRiwayatPeminjamanMe(opts: {
   token: string;
   page?: number;
   limit?: number;
+  status?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }): Promise<ListRiwayatMeResult> {
   const page = Math.max(1, Math.trunc(opts.page ?? 1));
   const limit = Math.min(100, Math.max(1, Math.trunc(opts.limit ?? 10)));
@@ -45,6 +48,10 @@ export async function fetchRiwayatPeminjamanMe(opts: {
   const url = new URL(`${API_URL}/peminjaman-buku/me/riwayat`);
   url.searchParams.set("page", String(page));
   url.searchParams.set("limit", String(limit));
+  
+  if (opts.status) url.searchParams.set("status", opts.status);
+  if (opts.sortBy) url.searchParams.set("sortBy", opts.sortBy);
+  if (opts.sortOrder) url.searchParams.set("sortOrder", opts.sortOrder);
 
   const res = await fetch(url.toString(), {
     method: "GET",
