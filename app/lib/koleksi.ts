@@ -29,6 +29,8 @@ export interface BukuRow {
   issn_or_isbn?: string | null;
   issn?: string | null;
   abstrak?: string | null;
+  sinopsis?: string | null;
+  jumlah_eksemplar?: number | null;
   kata_kunci?: string | null;
   kode_bahasa?: string | null;
   frekuensi_terbit?: string | null;
