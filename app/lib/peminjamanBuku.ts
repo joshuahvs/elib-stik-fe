@@ -355,16 +355,18 @@ export async function ajukanPerpanjanganPeminjaman(opts: {
 }): Promise<any> {
   const durasiHari = Math.max(1, Math.min(30, Math.trunc(opts.durasiHari)));
 
-  const candidates = [
-    `${API_URL}/peminjaman-buku/${encodeURIComponent(opts.loanId)}/perpanjangan`,
+  const endpoint = `${API_URL}/peminjaman-buku/${encodeURIComponent(opts.loanId)}/perpanjangan`;
+  const candidates: Array<{ url: string; method: "PATCH" | "POST" }> = [
+    { url: endpoint, method: "PATCH" },
+    { url: endpoint, method: "POST" },
   ];
 
   let lastError: Error | null = null;
 
-  for (const url of candidates) {
+  for (const candidate of candidates) {
     try {
-      const res = await fetch(url, {
-        method: "POST",
+      const res = await fetch(candidate.url, {
+        method: candidate.method,
         headers: {
           Authorization: `Bearer ${opts.token}`,
           Accept: "application/json",
