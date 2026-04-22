@@ -458,6 +458,11 @@ export default function BorrowedBooksPage() {
     useState<boolean>(false);
   const [perpanjanganError, setPerpanjanganError] = useState<unknown>(null);
 
+  // Filter and sort state
+  const [filterStatus, setFilterStatus] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<string>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
   function openPerpanjangan(item: BorrowedBook) {
     setPerpanjanganLoan(item);
     setPerpanjanganDurasi(7);
@@ -470,6 +475,23 @@ export default function BorrowedBooksPage() {
     setPerpanjanganOpen(false);
     setPerpanjanganLoan(null);
     setPerpanjanganError(null);
+  }
+
+  function handleFilterStatusChange(status: string | null) {
+    setFilterStatus(status);
+    setPage(1);
+  }
+
+  function handleSortChange(newSortBy: string) {
+    if (newSortBy === sortBy) {
+      // Toggle sort order if same sort field
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New sort field, default to desc
+      setSortBy(newSortBy);
+      setSortOrder('desc');
+    }
+    setPage(1);
   }
 
   async function submitPerpanjangan() {
@@ -583,6 +605,9 @@ export default function BorrowedBooksPage() {
           token: authToken,
           page,
           limit: pageSize,
+          status: filterStatus || undefined,
+          sortBy: sortBy === 'due-date' ? 'due-date' : undefined,
+          sortOrder: sortBy === 'due-date' ? sortOrder : undefined,
         });
 
         const mapped = (res.items ?? []).map(mapLoanToBorrowedBook);
@@ -620,7 +645,7 @@ export default function BorrowedBooksPage() {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [page, pageSize, refreshKey, token]);
+  }, [page, pageSize, refreshKey, token, filterStatus, sortBy, sortOrder]);
 
   return (
     <div className="min-h-screen bg-white">
@@ -633,6 +658,58 @@ export default function BorrowedBooksPage() {
             <p className="mt-2 text-slate-600">
               Daftar buku yang sedang atau pernah kamu pinjam.
             </p>
+          </div>
+        </div>
+
+        <ErrorMessage error={actionError} className="mt-6" />
+
+        {/* Filter and Sort Controls */}
+        <div className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:gap-6">
+          {/* Status Filter Dropdown */}
+          <div className="flex flex-col gap-2 flex-1">
+            <label className="text-sm font-semibold text-slate-900">Filter Status</label>
+            <select
+              value={filterStatus || ''}
+              onChange={(e) => handleFilterStatusChange(e.target.value || null)}
+              className="px-4 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-900 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#733015]/20 focus:border-[#733015]"
+            >
+              <option value="">Semua Status</option>
+              <option value="DIAJUKAN">Diajukan</option>
+              <option value="DISETUJUI">Disetujui</option>
+              <option value="DITOLAK">Ditolak</option>
+              <option value="DIPINJAM">Dipinjam</option>
+              <option value="SELESAI">Selesai</option>
+              <option value="DIBATALKAN">Dibatalkan</option>
+            </select>
+          </div>
+
+          {/* Sort Options */}
+          <div className="flex flex-col gap-2 flex-1">
+            <label className="text-sm font-semibold text-slate-900">Urutkan Berdasarkan</label>
+            <div className="flex gap-2">
+              {[
+                { label: 'Tanggal Terbaru', value: 'date' },
+                { label: 'Jatuh Tempo', value: 'due-date' },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => handleSortChange(option.value)}
+                  className={[
+                    'px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2',
+                    sortBy === option.value
+                      ? 'bg-gradient-to-r from-[#733015] to-[#8b5529] text-white'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200',
+                  ].join(' ')}
+                >
+                  {option.label}
+                  {sortBy === option.value && (
+                    <span className="text-xs">
+                      {sortOrder === 'asc' ? '↑' : '↓'}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
