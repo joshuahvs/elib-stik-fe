@@ -6,6 +6,8 @@ import { API_URL } from "@/app/lib/api";
 import { fetchAdminUsers } from "@/app/lib/adminUsers";
 import {
   fetchAdminPeminjamanBuku,
+  setujuiPerpanjanganByAdmin,
+  tolakPerpanjanganByAdmin,
   updatePeminjamanBukuByAdmin,
 } from "@/app/lib/peminjamanBuku";
 import ErrorMessage, { getErrorMessage } from "@/app/components/ErrorMessage";
@@ -89,6 +91,45 @@ function pickFirstString(obj: any, keys: string[]): string | undefined {
   return undefined;
 }
 
+function parseRequestedPeriodeHari(raw: unknown): number | null {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    const n = Math.trunc(raw);
+    return n > 0 ? n : null;
+  }
+  if (typeof raw === "string") {
+    const n = Number(raw.trim());
+    if (!Number.isFinite(n)) return null;
+    const int = Math.trunc(n);
+    return int > 0 ? int : null;
+  }
+  return null;
+}
+
+function isoDateToUtcMs(isoDate: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate.trim());
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mon = Number(m[2]);
+  const d = Number(m[3]);
+  if (!Number.isFinite(y) || !Number.isFinite(mon) || !Number.isFinite(d)) {
+    return null;
+  }
+  if (mon < 1 || mon > 12 || d < 1 || d > 31) return null;
+  return Date.UTC(y, mon - 1, d);
+}
+
+function computePeriodeFromDates(
+  tanggalPeminjaman?: string,
+  akhirPeminjaman?: string,
+): number | null {
+  if (!tanggalPeminjaman || !akhirPeminjaman) return null;
+  const startMs = isoDateToUtcMs(tanggalPeminjaman);
+  const endMs = isoDateToUtcMs(akhirPeminjaman);
+  if (startMs == null || endMs == null) return null;
+  const diffDays = Math.round((endMs - startMs) / (24 * 60 * 60 * 1000));
+  return diffDays > 0 ? diffDays : null;
+}
+
 function isLikelyUuid(value: unknown): boolean {
   if (typeof value !== "string") return false;
   const s = value.trim();
@@ -100,8 +141,11 @@ function isLikelyUuid(value: unknown): boolean {
 type AdminLoanRow = {
   id: string;
   status: string;
+  statusPerpanjangan?: string;
   tanggal_peminjaman?: string;
   akhir_peminjaman?: string;
+  akhirPerpanjangan?: string;
+  requestedPeriodeHari?: number;
   bukuJudul: string;
   userId: string | null;
   userName: string | null;
@@ -113,6 +157,12 @@ function mapAdminLoan(row: any): AdminLoanRow {
 
   const id = String(row?.id ?? row?.loanId ?? row?.peminjamanId ?? "-");
   const status = String(row?.status ?? "-");
+  const statusPerpanjangan =
+    typeof row?.status_perpanjangan === "string"
+      ? row.status_perpanjangan
+      : typeof row?.statusPerpanjangan === "string"
+        ? row.statusPerpanjangan
+        : undefined;
 
   const tanggal_peminjaman =
     toIsoDate(
@@ -121,6 +171,21 @@ function mapAdminLoan(row: any): AdminLoanRow {
 
   const akhir_peminjaman =
     toIsoDate(row?.akhir_peminjaman ?? row?.jatuhTempo ?? row?.end_date) ||
+    undefined;
+
+  const akhirPerpanjangan =
+    toIsoDate(row?.akhir_perpanjangan ?? row?.akhirPerpanjangan) || undefined;
+
+  const requestedPeriodeHari =
+    parseRequestedPeriodeHari(
+      row?.periode_hari ??
+        row?.periodeHari ??
+        row?.durasi_hari ??
+        row?.durasiHari ??
+        row?.hari_pengajuan ??
+        row?.hariPengajuan,
+    ) ??
+    computePeriodeFromDates(tanggal_peminjaman, akhir_peminjaman) ??
     undefined;
 
   const bukuJudul =
@@ -166,8 +231,11 @@ function mapAdminLoan(row: any): AdminLoanRow {
   return {
     id,
     status,
+    statusPerpanjangan,
     tanggal_peminjaman,
     akhir_peminjaman,
+    akhirPerpanjangan,
+    requestedPeriodeHari,
     bukuJudul,
     userId,
     userName,
@@ -317,8 +385,14 @@ export default function AdminBorrowedBookRequestsPage() {
     setApproveError(null);
 
     const initialTanggal = row.tanggal_peminjaman || toIsoDate(new Date());
+    const initialPeriode =
+      typeof row.requestedPeriodeHari === "number" &&
+      Number.isFinite(row.requestedPeriodeHari) &&
+      row.requestedPeriodeHari > 0
+        ? Math.trunc(row.requestedPeriodeHari)
+        : 7;
     setTanggalPinjam(initialTanggal);
-    setPeriodeHari(7);
+    setPeriodeHari(initialPeriode);
 
     setApproveOpen(true);
   }
@@ -404,6 +478,58 @@ export default function AdminBorrowedBookRequestsPage() {
       prevStatus: prev,
       nextStatus: "DITOLAK",
     });
+  }
+
+  async function approvePerpanjangan(row: AdminLoanRow) {
+    if (!token) return;
+
+    try {
+      setMutatingId(row.id);
+      setActionError(null);
+      await setujuiPerpanjanganByAdmin({ token, id: row.id });
+
+      setRows((current) =>
+        current.map((r) =>
+          r.id === row.id
+            ? {
+                ...r,
+                statusPerpanjangan: "DISETUJUI",
+              }
+            : r,
+        ),
+      );
+    } catch (e) {
+      setActionError(getErrorMessage(e, "Gagal menyetujui perpanjangan"));
+    } finally {
+      setMutatingId(null);
+    }
+  }
+
+  async function rejectPerpanjangan(row: AdminLoanRow) {
+    if (!token) return;
+    const ok = window.confirm("Tolak pengajuan perpanjangan ini?");
+    if (!ok) return;
+
+    try {
+      setMutatingId(row.id);
+      setActionError(null);
+      await tolakPerpanjanganByAdmin({ token, id: row.id });
+
+      setRows((current) =>
+        current.map((r) =>
+          r.id === row.id
+            ? {
+                ...r,
+                statusPerpanjangan: "DITOLAK",
+              }
+            : r,
+        ),
+      );
+    } catch (e) {
+      setActionError(getErrorMessage(e, "Gagal menolak perpanjangan"));
+    } finally {
+      setMutatingId(null);
+    }
   }
 
   const empty = !isLoading && rows.length === 0;
@@ -526,6 +652,18 @@ export default function AdminBorrowedBookRequestsPage() {
                       const normalizedStatus = normalizeStatus(r.status);
                       const isPending = normalizedStatus === "DIAJUKAN";
                       const isReturned = normalizedStatus === "DIKEMBALIKAN";
+                      const normalizedExt = String(
+                        r.statusPerpanjangan ?? "",
+                      ).toUpperCase();
+                      const extLabel =
+                        normalizedExt === "DIAJUKAN"
+                          ? "Diajukan"
+                          : normalizedExt === "DISETUJUI"
+                            ? "Disetujui"
+                            : normalizedExt === "DITOLAK"
+                              ? "Ditolak"
+                              : "";
+                      const extPending = normalizedExt === "DIAJUKAN";
 
                       const canEditStatus =
                         !isPending &&
@@ -565,78 +703,119 @@ export default function AdminBorrowedBookRequestsPage() {
                               : "-"}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {canEditStatus ? (
-                              <div className="relative inline-flex">
-                                <select
-                                  value={normalizedStatus}
-                                  onChange={(e) => {
-                                    const next = String(e.target.value);
-                                    void setStatus({
-                                      rowId: r.id,
-                                      prevStatus: normalizedStatus,
-                                      nextStatus: next,
-                                    });
-                                  }}
-                                  disabled={mutatingId === r.id}
+                            <div className="flex flex-col items-start gap-2">
+                              {canEditStatus ? (
+                                <div className="relative inline-flex">
+                                  <select
+                                    value={normalizedStatus}
+                                    onChange={(e) => {
+                                      const next = String(e.target.value);
+                                      void setStatus({
+                                        rowId: r.id,
+                                        prevStatus: normalizedStatus,
+                                        nextStatus: next,
+                                      });
+                                    }}
+                                    disabled={mutatingId === r.id}
+                                    className={[
+                                      "h-7 rounded-full pl-3 pr-8 text-xs font-medium",
+                                      "appearance-none",
+                                      "focus:outline-none focus:ring-2 focus:ring-slate-200",
+                                      statusBadgeClass(normalizedStatus),
+                                      mutatingId === r.id
+                                        ? "opacity-60 cursor-not-allowed"
+                                        : "cursor-pointer",
+                                    ].join(" ")}
+                                  >
+                                    {normalizedStatus === "DISETUJUI" ? (
+                                      <>
+                                        <option value="DISETUJUI">
+                                          {statusLabel("DISETUJUI")}
+                                        </option>
+                                        <option value="DIPINJAM">
+                                          {statusLabel("DIPINJAM")}
+                                        </option>
+                                        <option value="DIKEMBALIKAN">
+                                          {statusLabel("DIKEMBALIKAN")}
+                                        </option>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <option value="DIPINJAM">
+                                          {statusLabel("DIPINJAM")}
+                                        </option>
+                                        <option value="DIKEMBALIKAN">
+                                          {statusLabel("DIKEMBALIKAN")}
+                                        </option>
+                                      </>
+                                    )}
+                                  </select>
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                    className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 opacity-80"
+                                  >
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.24 4.5a.75.75 0 01-1.08 0l-4.24-4.5a.75.75 0 01.02-1.06z"
+                                      clipRule="evenodd"
+                                    />
+                                  </svg>
+                                </div>
+                              ) : (
+                                <span
                                   className={[
-                                    "h-7 rounded-full pl-3 pr-8 text-xs font-medium",
-                                    "appearance-none",
-                                    "focus:outline-none focus:ring-2 focus:ring-slate-200",
+                                    "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
                                     statusBadgeClass(normalizedStatus),
-                                    mutatingId === r.id
-                                      ? "opacity-60 cursor-not-allowed"
-                                      : "cursor-pointer",
                                   ].join(" ")}
                                 >
-                                  {normalizedStatus === "DISETUJUI" ? (
+                                  {statusLabel(normalizedStatus)}
+                                </span>
+                              )}
+
+                              {extLabel ? (
+                                <div className="text-xs text-slate-600 whitespace-normal break-words">
+                                  <span className="font-medium text-slate-900">
+                                    Perpanjangan:
+                                  </span>{" "}
+                                  {extLabel}
+                                  {r.akhirPerpanjangan ? (
                                     <>
-                                      <option value="DISETUJUI">
-                                        {statusLabel("DISETUJUI")}
-                                      </option>
-                                      <option value="DIPINJAM">
-                                        {statusLabel("DIPINJAM")}
-                                      </option>
-                                      <option value="DIKEMBALIKAN">
-                                        {statusLabel("DIKEMBALIKAN")}
-                                      </option>
+                                      <span className="text-slate-400">
+                                        {" "}
+                                        ·{" "}
+                                      </span>
+                                      <span>
+                                        hingga {formatDate(r.akhirPerpanjangan)}
+                                      </span>
                                     </>
-                                  ) : (
-                                    <>
-                                      <option value="DIPINJAM">
-                                        {statusLabel("DIPINJAM")}
-                                      </option>
-                                      <option value="DIKEMBALIKAN">
-                                        {statusLabel("DIKEMBALIKAN")}
-                                      </option>
-                                    </>
-                                  )}
-                                </select>
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  viewBox="0 0 20 20"
-                                  fill="currentColor"
-                                  className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 opacity-80"
-                                >
-                                  <path
-                                    fillRule="evenodd"
-                                    d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.24 4.5a.75.75 0 01-1.08 0l-4.24-4.5a.75.75 0 01.02-1.06z"
-                                    clipRule="evenodd"
-                                  />
-                                </svg>
-                              </div>
-                            ) : (
-                              <span
-                                className={[
-                                  "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
-                                  statusBadgeClass(normalizedStatus),
-                                ].join(" ")}
-                              >
-                                {statusLabel(normalizedStatus)}
-                              </span>
-                            )}
+                                  ) : null}
+                                </div>
+                              ) : null}
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {isPending ? (
+                            {extPending ? (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => void approvePerpanjangan(r)}
+                                  disabled={mutatingId === r.id}
+                                  className="inline-flex h-9 items-center rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Setujui Perpanjangan
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void rejectPerpanjangan(r)}
+                                  disabled={mutatingId === r.id}
+                                  className="inline-flex h-9 items-center rounded-lg bg-red-600 px-3 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Tolak Perpanjangan
+                                </button>
+                              </div>
+                            ) : isPending ? (
                               <div className="flex items-center gap-2">
                                 <button
                                   type="button"
