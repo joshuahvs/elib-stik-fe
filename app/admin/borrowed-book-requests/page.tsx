@@ -142,6 +142,7 @@ type AdminLoanRow = {
   id: string;
   status: string;
   statusPerpanjangan?: string;
+  catatan?: string;
   tanggal_peminjaman?: string;
   akhir_peminjaman?: string;
   akhirPerpanjangan?: string;
@@ -163,6 +164,10 @@ function mapAdminLoan(row: any): AdminLoanRow {
       : typeof row?.statusPerpanjangan === "string"
         ? row.statusPerpanjangan
         : undefined;
+  const catatan =
+    typeof row?.catatan === "string"
+      ? row.catatan.trim() || undefined
+      : undefined;
 
   const tanggal_peminjaman =
     toIsoDate(
@@ -232,6 +237,7 @@ function mapAdminLoan(row: any): AdminLoanRow {
     id,
     status,
     statusPerpanjangan,
+    catatan,
     tanggal_peminjaman,
     akhir_peminjaman,
     akhirPerpanjangan,
@@ -264,6 +270,15 @@ export default function AdminBorrowedBookRequestsPage() {
   const [periodeHari, setPeriodeHari] = useState<number>(7);
   const [submitting, setSubmitting] = useState(false);
   const [approveError, setApproveError] = useState<string | null>(null);
+
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectMode, setRejectMode] = useState<"PINJAMAN" | "PERPANJANGAN">(
+    "PINJAMAN",
+  );
+  const [rejectRow, setRejectRow] = useState<AdminLoanRow | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
+  const [rejectError, setRejectError] = useState<string | null>(null);
 
   const [mutatingId, setMutatingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -397,6 +412,25 @@ export default function AdminBorrowedBookRequestsPage() {
     setApproveOpen(true);
   }
 
+  function openRejectModal(
+    row: AdminLoanRow,
+    mode: "PINJAMAN" | "PERPANJANGAN",
+  ) {
+    setRejectMode(mode);
+    setRejectRow(row);
+    setRejectReason("");
+    setRejectError(null);
+    setRejectOpen(true);
+  }
+
+  function closeRejectModal(force = false) {
+    if (rejectSubmitting && !force) return;
+    setRejectOpen(false);
+    setRejectRow(null);
+    setRejectError(null);
+    setRejectReason("");
+  }
+
   async function approve() {
     if (!token || !approveId) return;
     if (!tanggalPinjam || !akhirPinjam) return;
@@ -468,16 +502,73 @@ export default function AdminBorrowedBookRequestsPage() {
     }
   }
 
-  async function reject(row: AdminLoanRow) {
-    const ok = window.confirm("Tolak permintaan peminjaman ini?");
-    if (!ok) return;
+  async function submitReject() {
+    if (!token || !rejectRow) return;
+    const reason = rejectReason.trim();
+    if (!reason) {
+      setRejectError("Alasan penolakan wajib diisi");
+      return;
+    }
 
-    const prev = normalizeStatus(row.status);
-    await setStatus({
-      rowId: row.id,
-      prevStatus: prev,
-      nextStatus: "DITOLAK",
-    });
+    try {
+      setRejectSubmitting(true);
+      setRejectError(null);
+      setActionError(null);
+      setMutatingId(rejectRow.id);
+
+      if (rejectMode === "PINJAMAN") {
+        await updatePeminjamanBukuByAdmin({
+          token,
+          id: rejectRow.id,
+          status: "DITOLAK",
+          catatan: reason,
+        });
+
+        setRows((current) =>
+          current.map((r) =>
+            r.id === rejectRow.id
+              ? {
+                  ...r,
+                  status: "DITOLAK",
+                  catatan: reason,
+                }
+              : r,
+          ),
+        );
+      } else {
+        await tolakPerpanjanganByAdmin({
+          token,
+          id: rejectRow.id,
+          catatan: reason,
+        });
+
+        setRows((current) =>
+          current.map((r) =>
+            r.id === rejectRow.id
+              ? {
+                  ...r,
+                  statusPerpanjangan: "DITOLAK",
+                  catatan: reason,
+                }
+              : r,
+          ),
+        );
+      }
+
+      closeRejectModal(true);
+    } catch (e) {
+      setRejectError(
+        getErrorMessage(
+          e,
+          rejectMode === "PINJAMAN"
+            ? "Gagal menolak peminjaman"
+            : "Gagal menolak perpanjangan",
+        ),
+      );
+    } finally {
+      setRejectSubmitting(false);
+      setMutatingId(null);
+    }
   }
 
   async function approvePerpanjangan(row: AdminLoanRow) {
@@ -500,33 +591,6 @@ export default function AdminBorrowedBookRequestsPage() {
       );
     } catch (e) {
       setActionError(getErrorMessage(e, "Gagal menyetujui perpanjangan"));
-    } finally {
-      setMutatingId(null);
-    }
-  }
-
-  async function rejectPerpanjangan(row: AdminLoanRow) {
-    if (!token) return;
-    const ok = window.confirm("Tolak pengajuan perpanjangan ini?");
-    if (!ok) return;
-
-    try {
-      setMutatingId(row.id);
-      setActionError(null);
-      await tolakPerpanjanganByAdmin({ token, id: row.id });
-
-      setRows((current) =>
-        current.map((r) =>
-          r.id === row.id
-            ? {
-                ...r,
-                statusPerpanjangan: "DITOLAK",
-              }
-            : r,
-        ),
-      );
-    } catch (e) {
-      setActionError(getErrorMessage(e, "Gagal menolak perpanjangan"));
     } finally {
       setMutatingId(null);
     }
@@ -664,6 +728,10 @@ export default function AdminBorrowedBookRequestsPage() {
                               ? "Ditolak"
                               : "";
                       const extPending = normalizedExt === "DIAJUKAN";
+                      const showAlasanDitolak =
+                        Boolean(r.catatan) &&
+                        (normalizedStatus === "DITOLAK" ||
+                          normalizedExt === "DITOLAK");
 
                       const canEditStatus =
                         !isPending &&
@@ -793,6 +861,15 @@ export default function AdminBorrowedBookRequestsPage() {
                                   ) : null}
                                 </div>
                               ) : null}
+
+                              {showAlasanDitolak ? (
+                                <div className="text-xs text-rose-700 whitespace-normal break-words">
+                                  <span className="font-medium">
+                                    Alasan ditolak:
+                                  </span>{" "}
+                                  {r.catatan}
+                                </div>
+                              ) : null}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -808,7 +885,9 @@ export default function AdminBorrowedBookRequestsPage() {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => void rejectPerpanjangan(r)}
+                                  onClick={() =>
+                                    openRejectModal(r, "PERPANJANGAN")
+                                  }
                                   disabled={mutatingId === r.id}
                                   className="inline-flex h-9 items-center rounded-lg bg-red-600 px-3 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
@@ -827,7 +906,7 @@ export default function AdminBorrowedBookRequestsPage() {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => reject(r)}
+                                  onClick={() => openRejectModal(r, "PINJAMAN")}
                                   disabled={mutatingId === r.id}
                                   className="inline-flex h-9 items-center rounded-lg bg-red-600 px-3 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
@@ -955,6 +1034,67 @@ export default function AdminBorrowedBookRequestsPage() {
                   className="h-10 px-4 rounded-xl bg-slate-900 text-white font-medium hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submitting ? "Menyimpan…" : "Setujui"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {rejectOpen ? (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-6"
+            role="dialog"
+            aria-modal="true"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) closeRejectModal();
+            }}
+          >
+            <div className="w-full max-w-md rounded-2xl bg-white border p-6 shadow-lg">
+              <div className="text-lg font-semibold text-slate-900">
+                {rejectMode === "PINJAMAN"
+                  ? "Tolak Peminjaman"
+                  : "Tolak Perpanjangan"}
+              </div>
+
+              <p className="mt-2 text-sm text-slate-600">
+                Alasan penolakan ini akan ditampilkan ke pengguna di riwayat
+                peminjaman.
+              </p>
+
+              <ErrorMessage error={rejectError} className="mt-4" />
+
+              <div className="mt-4">
+                <label className="block text-sm text-slate-700 mb-2">
+                  Alasan Penolakan
+                </label>
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="Contoh: Buku sedang dalam perbaikan sehingga belum bisa dipinjam."
+                  rows={4}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-black"
+                  disabled={rejectSubmitting}
+                />
+              </div>
+
+              <div className="mt-6 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  className="h-10 px-4 rounded-xl border border-slate-300 bg-white text-slate-900 font-medium hover:bg-slate-50"
+                  onClick={() => closeRejectModal()}
+                  disabled={rejectSubmitting}
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void submitReject()}
+                  disabled={
+                    rejectSubmitting || !rejectRow || !rejectReason.trim()
+                  }
+                  className="h-10 px-4 rounded-xl bg-red-600 text-white font-medium hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {rejectSubmitting ? "Menyimpan…" : "Tolak"}
                 </button>
               </div>
             </div>

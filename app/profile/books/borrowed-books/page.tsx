@@ -30,6 +30,7 @@ type BorrowedBook = {
   status?: string;
   statusPerpanjangan?: string;
   akhirPerpanjangan?: string;
+  catatan?: string;
 };
 
 function pickFirstString(obj: any, keys: string[]): string | undefined {
@@ -119,6 +120,11 @@ function mapLoanToBorrowedBook(row: any): BorrowedBook {
   const akhirPerpanjangan =
     toIsoDate(row?.akhir_perpanjangan ?? row?.akhirPerpanjangan) || undefined;
 
+  const catatan =
+    typeof row?.catatan === "string"
+      ? row.catatan.trim() || undefined
+      : undefined;
+
   return {
     id: String(loanId),
     bukuId,
@@ -131,6 +137,7 @@ function mapLoanToBorrowedBook(row: any): BorrowedBook {
     status: typeof row?.status === "string" ? row.status : undefined,
     statusPerpanjangan,
     akhirPerpanjangan,
+    catatan,
   };
 }
 
@@ -712,6 +719,9 @@ export default function BorrowedBooksPage() {
                       item.statusPerpanjangan,
                     );
                     const effectiveDueDate = getEffectiveDueDate(item);
+                    const showAlasanDitolak =
+                      Boolean(item.catatan) &&
+                      (status === "Ditolak" || perpanjanganLabel === "Ditolak");
 
                     const isReturned =
                       status === "Dikembalikan" || Boolean(item.tanggalKembali);
@@ -824,6 +834,14 @@ export default function BorrowedBooksPage() {
                                     </span>
                                   </>
                                 ) : null}
+                              </div>
+                            ) : null}
+                            {showAlasanDitolak ? (
+                              <div className="text-xs text-rose-700 whitespace-normal break-words">
+                                <span className="font-medium">
+                                  Alasan ditolak:
+                                </span>{" "}
+                                {item.catatan}
                               </div>
                             ) : null}
                           </div>
