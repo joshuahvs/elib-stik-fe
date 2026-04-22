@@ -97,8 +97,8 @@ export async function uploadSkripsi(opts: {
   judul: string;
   tahun: string;
   abstrak: string;
-  pembimbing?: string;
-  penguji?: string;
+  pembimbing: string;
+  penguji: string;
   penulis_tambahan?: Array<{ nim: string; nama: string }>;
   file: File;
   file_ttd: File;
@@ -114,12 +114,8 @@ export async function uploadSkripsi(opts: {
   formData.append("judul", opts.judul);
   formData.append("tahun", opts.tahun);
   formData.append("abstrak", opts.abstrak);
-  if (opts.pembimbing?.trim()) {
-    formData.append("pembimbing", opts.pembimbing.trim());
-  }
-  if (opts.penguji?.trim()) {
-    formData.append("penguji", opts.penguji.trim());
-  }
+  formData.append("pembimbing", opts.pembimbing.trim());
+  formData.append("penguji", opts.penguji.trim());
   for (const penulis of opts.penulis_tambahan ?? []) {
     const nim = String(penulis?.nim ?? "").trim();
     const nama = String(penulis?.nama ?? "").trim();

@@ -6,8 +6,11 @@ import { API_URL } from "@/app/lib/api";
 import { fetchAdminUsers } from "@/app/lib/adminUsers";
 import {
   fetchAdminPeminjamanBuku,
+  setujuiPerpanjanganByAdmin,
+  tolakPerpanjanganByAdmin,
   updatePeminjamanBukuByAdmin,
 } from "@/app/lib/peminjamanBuku";
+import Dropdown from "@/app/components/DropDown";
 import ErrorMessage, { getErrorMessage } from "@/app/components/ErrorMessage";
 
 function getRole(me: any): string | undefined {
@@ -65,6 +68,18 @@ function statusLabel(statusRaw: any): string {
   return String(statusRaw ?? "-");
 }
 
+function statusFromLabel(label: string): string {
+  const s = String(label ?? "")
+    .trim()
+    .toUpperCase();
+  if (s === "DISETUJUI") return "DISETUJUI";
+  if (s === "DIAMBIL" || s === "DIPINJAM") return "DIPINJAM";
+  if (s === "DIKEMBALIKAN") return "DIKEMBALIKAN";
+  if (s === "DITOLAK") return "DITOLAK";
+  if (s === "DIAJUKAN") return "DIAJUKAN";
+  return s;
+}
+
 function statusBadgeClass(statusRaw: any): string {
   const s = String(statusRaw ?? "").toUpperCase();
   if (s === "DIAJUKAN") return "bg-blue-600 text-white";
@@ -89,6 +104,45 @@ function pickFirstString(obj: any, keys: string[]): string | undefined {
   return undefined;
 }
 
+function parseRequestedPeriodeHari(raw: unknown): number | null {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    const n = Math.trunc(raw);
+    return n > 0 ? n : null;
+  }
+  if (typeof raw === "string") {
+    const n = Number(raw.trim());
+    if (!Number.isFinite(n)) return null;
+    const int = Math.trunc(n);
+    return int > 0 ? int : null;
+  }
+  return null;
+}
+
+function isoDateToUtcMs(isoDate: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate.trim());
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mon = Number(m[2]);
+  const d = Number(m[3]);
+  if (!Number.isFinite(y) || !Number.isFinite(mon) || !Number.isFinite(d)) {
+    return null;
+  }
+  if (mon < 1 || mon > 12 || d < 1 || d > 31) return null;
+  return Date.UTC(y, mon - 1, d);
+}
+
+function computePeriodeFromDates(
+  tanggalPeminjaman?: string,
+  akhirPeminjaman?: string,
+): number | null {
+  if (!tanggalPeminjaman || !akhirPeminjaman) return null;
+  const startMs = isoDateToUtcMs(tanggalPeminjaman);
+  const endMs = isoDateToUtcMs(akhirPeminjaman);
+  if (startMs == null || endMs == null) return null;
+  const diffDays = Math.round((endMs - startMs) / (24 * 60 * 60 * 1000));
+  return diffDays > 0 ? diffDays : null;
+}
+
 function isLikelyUuid(value: unknown): boolean {
   if (typeof value !== "string") return false;
   const s = value.trim();
@@ -100,8 +154,12 @@ function isLikelyUuid(value: unknown): boolean {
 type AdminLoanRow = {
   id: string;
   status: string;
+  statusPerpanjangan?: string;
+  catatan?: string;
   tanggal_peminjaman?: string;
   akhir_peminjaman?: string;
+  akhirPerpanjangan?: string;
+  requestedPeriodeHari?: number;
   bukuJudul: string;
   userId: string | null;
   userName: string | null;
@@ -113,6 +171,16 @@ function mapAdminLoan(row: any): AdminLoanRow {
 
   const id = String(row?.id ?? row?.loanId ?? row?.peminjamanId ?? "-");
   const status = String(row?.status ?? "-");
+  const statusPerpanjangan =
+    typeof row?.status_perpanjangan === "string"
+      ? row.status_perpanjangan
+      : typeof row?.statusPerpanjangan === "string"
+        ? row.statusPerpanjangan
+        : undefined;
+  const catatan =
+    typeof row?.catatan === "string"
+      ? row.catatan.trim() || undefined
+      : undefined;
 
   const tanggal_peminjaman =
     toIsoDate(
@@ -121,6 +189,21 @@ function mapAdminLoan(row: any): AdminLoanRow {
 
   const akhir_peminjaman =
     toIsoDate(row?.akhir_peminjaman ?? row?.jatuhTempo ?? row?.end_date) ||
+    undefined;
+
+  const akhirPerpanjangan =
+    toIsoDate(row?.akhir_perpanjangan ?? row?.akhirPerpanjangan) || undefined;
+
+  const requestedPeriodeHari =
+    parseRequestedPeriodeHari(
+      row?.periode_hari ??
+        row?.periodeHari ??
+        row?.durasi_hari ??
+        row?.durasiHari ??
+        row?.hari_pengajuan ??
+        row?.hariPengajuan,
+    ) ??
+    computePeriodeFromDates(tanggal_peminjaman, akhir_peminjaman) ??
     undefined;
 
   const bukuJudul =
@@ -166,8 +249,12 @@ function mapAdminLoan(row: any): AdminLoanRow {
   return {
     id,
     status,
+    statusPerpanjangan,
+    catatan,
     tanggal_peminjaman,
     akhir_peminjaman,
+    akhirPerpanjangan,
+    requestedPeriodeHari,
     bukuJudul,
     userId,
     userName,
@@ -196,6 +283,15 @@ export default function AdminBorrowedBookRequestsPage() {
   const [periodeHari, setPeriodeHari] = useState<number>(7);
   const [submitting, setSubmitting] = useState(false);
   const [approveError, setApproveError] = useState<string | null>(null);
+
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectMode, setRejectMode] = useState<"PINJAMAN" | "PERPANJANGAN">(
+    "PINJAMAN",
+  );
+  const [rejectRow, setRejectRow] = useState<AdminLoanRow | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
+  const [rejectError, setRejectError] = useState<string | null>(null);
 
   const [mutatingId, setMutatingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -317,10 +413,35 @@ export default function AdminBorrowedBookRequestsPage() {
     setApproveError(null);
 
     const initialTanggal = row.tanggal_peminjaman || toIsoDate(new Date());
+    const initialPeriode =
+      typeof row.requestedPeriodeHari === "number" &&
+      Number.isFinite(row.requestedPeriodeHari) &&
+      row.requestedPeriodeHari > 0
+        ? Math.trunc(row.requestedPeriodeHari)
+        : 7;
     setTanggalPinjam(initialTanggal);
-    setPeriodeHari(7);
+    setPeriodeHari(initialPeriode);
 
     setApproveOpen(true);
+  }
+
+  function openRejectModal(
+    row: AdminLoanRow,
+    mode: "PINJAMAN" | "PERPANJANGAN",
+  ) {
+    setRejectMode(mode);
+    setRejectRow(row);
+    setRejectReason("");
+    setRejectError(null);
+    setRejectOpen(true);
+  }
+
+  function closeRejectModal(force = false) {
+    if (rejectSubmitting && !force) return;
+    setRejectOpen(false);
+    setRejectRow(null);
+    setRejectError(null);
+    setRejectReason("");
   }
 
   async function approve() {
@@ -394,16 +515,98 @@ export default function AdminBorrowedBookRequestsPage() {
     }
   }
 
-  async function reject(row: AdminLoanRow) {
-    const ok = window.confirm("Tolak permintaan peminjaman ini?");
-    if (!ok) return;
+  async function submitReject() {
+    if (!token || !rejectRow) return;
+    const reason = rejectReason.trim();
+    if (!reason) {
+      setRejectError("Alasan penolakan wajib diisi");
+      return;
+    }
 
-    const prev = normalizeStatus(row.status);
-    await setStatus({
-      rowId: row.id,
-      prevStatus: prev,
-      nextStatus: "DITOLAK",
-    });
+    try {
+      setRejectSubmitting(true);
+      setRejectError(null);
+      setActionError(null);
+      setMutatingId(rejectRow.id);
+
+      if (rejectMode === "PINJAMAN") {
+        await updatePeminjamanBukuByAdmin({
+          token,
+          id: rejectRow.id,
+          status: "DITOLAK",
+          catatan: reason,
+        });
+
+        setRows((current) =>
+          current.map((r) =>
+            r.id === rejectRow.id
+              ? {
+                  ...r,
+                  status: "DITOLAK",
+                  catatan: reason,
+                }
+              : r,
+          ),
+        );
+      } else {
+        await tolakPerpanjanganByAdmin({
+          token,
+          id: rejectRow.id,
+          catatan: reason,
+        });
+
+        setRows((current) =>
+          current.map((r) =>
+            r.id === rejectRow.id
+              ? {
+                  ...r,
+                  statusPerpanjangan: "DITOLAK",
+                  catatan: reason,
+                }
+              : r,
+          ),
+        );
+      }
+
+      closeRejectModal(true);
+    } catch (e) {
+      setRejectError(
+        getErrorMessage(
+          e,
+          rejectMode === "PINJAMAN"
+            ? "Gagal menolak peminjaman"
+            : "Gagal menolak perpanjangan",
+        ),
+      );
+    } finally {
+      setRejectSubmitting(false);
+      setMutatingId(null);
+    }
+  }
+
+  async function approvePerpanjangan(row: AdminLoanRow) {
+    if (!token) return;
+
+    try {
+      setMutatingId(row.id);
+      setActionError(null);
+      await setujuiPerpanjanganByAdmin({ token, id: row.id });
+
+      setRows((current) =>
+        current.map((r) =>
+          r.id === row.id
+            ? {
+                ...r,
+                statusPerpanjangan: "DISETUJUI",
+              }
+            : r,
+        ),
+      );
+    } catch (e) {
+      setActionError(getErrorMessage(e, "Gagal menyetujui perpanjangan"));
+    } finally {
+      setMutatingId(null);
+    }
   }
 
   const empty = !isLoading && rows.length === 0;
@@ -526,6 +729,22 @@ export default function AdminBorrowedBookRequestsPage() {
                       const normalizedStatus = normalizeStatus(r.status);
                       const isPending = normalizedStatus === "DIAJUKAN";
                       const isReturned = normalizedStatus === "DIKEMBALIKAN";
+                      const normalizedExt = String(
+                        r.statusPerpanjangan ?? "",
+                      ).toUpperCase();
+                      const extLabel =
+                        normalizedExt === "DIAJUKAN"
+                          ? "Diajukan"
+                          : normalizedExt === "DISETUJUI"
+                            ? "Disetujui"
+                            : normalizedExt === "DITOLAK"
+                              ? "Ditolak"
+                              : "";
+                      const extPending = normalizedExt === "DIAJUKAN";
+                      const showAlasanDitolak =
+                        Boolean(r.catatan) &&
+                        (normalizedStatus === "DITOLAK" ||
+                          normalizedExt === "DITOLAK");
 
                       const canEditStatus =
                         !isPending &&
@@ -565,78 +784,108 @@ export default function AdminBorrowedBookRequestsPage() {
                               : "-"}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {canEditStatus ? (
-                              <div className="relative inline-flex">
-                                <select
-                                  value={normalizedStatus}
-                                  onChange={(e) => {
-                                    const next = String(e.target.value);
-                                    void setStatus({
-                                      rowId: r.id,
-                                      prevStatus: normalizedStatus,
-                                      nextStatus: next,
-                                    });
-                                  }}
-                                  disabled={mutatingId === r.id}
+                            <div className="flex flex-col items-start gap-2">
+                              {canEditStatus ? (
+                                <div className="w-44">
+                                  <Dropdown
+                                    label="Status"
+                                    labelClassName="sr-only"
+                                    value={statusLabel(normalizedStatus)}
+                                    options={
+                                      normalizedStatus === "DISETUJUI"
+                                        ? [
+                                            statusLabel("DISETUJUI"),
+                                            statusLabel("DIPINJAM"),
+                                            statusLabel("DIKEMBALIKAN"),
+                                          ]
+                                        : [
+                                            statusLabel("DIPINJAM"),
+                                            statusLabel("DIKEMBALIKAN"),
+                                          ]
+                                    }
+                                    onChange={(label) => {
+                                      if (mutatingId === r.id) return;
+                                      const next = statusFromLabel(label);
+                                      void setStatus({
+                                        rowId: r.id,
+                                        prevStatus: normalizedStatus,
+                                        nextStatus: next,
+                                      });
+                                    }}
+                                    buttonClassName={[
+                                      "!rounded-full !px-3 !py-1.5 !text-xs !font-medium !min-h-0",
+                                      statusBadgeClass(normalizedStatus),
+                                      mutatingId === r.id
+                                        ? "opacity-60 pointer-events-none"
+                                        : "",
+                                    ].join(" ")}
+                                    valueClassName="!text-white"
+                                  />
+                                </div>
+                              ) : (
+                                <span
                                   className={[
-                                    "h-7 rounded-full pl-3 pr-8 text-xs font-medium",
-                                    "appearance-none",
-                                    "focus:outline-none focus:ring-2 focus:ring-slate-200",
+                                    "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
                                     statusBadgeClass(normalizedStatus),
-                                    mutatingId === r.id
-                                      ? "opacity-60 cursor-not-allowed"
-                                      : "cursor-pointer",
                                   ].join(" ")}
                                 >
-                                  {normalizedStatus === "DISETUJUI" ? (
+                                  {statusLabel(normalizedStatus)}
+                                </span>
+                              )}
+
+                              {extLabel ? (
+                                <div className="text-xs text-slate-600 whitespace-normal break-words">
+                                  <span className="font-medium text-slate-900">
+                                    Perpanjangan:
+                                  </span>{" "}
+                                  {extLabel}
+                                  {r.akhirPerpanjangan ? (
                                     <>
-                                      <option value="DISETUJUI">
-                                        {statusLabel("DISETUJUI")}
-                                      </option>
-                                      <option value="DIPINJAM">
-                                        {statusLabel("DIPINJAM")}
-                                      </option>
-                                      <option value="DIKEMBALIKAN">
-                                        {statusLabel("DIKEMBALIKAN")}
-                                      </option>
+                                      <span className="text-slate-400">
+                                        {" "}
+                                        ·{" "}
+                                      </span>
+                                      <span>
+                                        hingga {formatDate(r.akhirPerpanjangan)}
+                                      </span>
                                     </>
-                                  ) : (
-                                    <>
-                                      <option value="DIPINJAM">
-                                        {statusLabel("DIPINJAM")}
-                                      </option>
-                                      <option value="DIKEMBALIKAN">
-                                        {statusLabel("DIKEMBALIKAN")}
-                                      </option>
-                                    </>
-                                  )}
-                                </select>
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  viewBox="0 0 20 20"
-                                  fill="currentColor"
-                                  className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 opacity-80"
-                                >
-                                  <path
-                                    fillRule="evenodd"
-                                    d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.24 4.5a.75.75 0 01-1.08 0l-4.24-4.5a.75.75 0 01.02-1.06z"
-                                    clipRule="evenodd"
-                                  />
-                                </svg>
-                              </div>
-                            ) : (
-                              <span
-                                className={[
-                                  "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
-                                  statusBadgeClass(normalizedStatus),
-                                ].join(" ")}
-                              >
-                                {statusLabel(normalizedStatus)}
-                              </span>
-                            )}
+                                  ) : null}
+                                </div>
+                              ) : null}
+
+                              {showAlasanDitolak ? (
+                                <div className="text-xs text-rose-700 whitespace-normal break-words">
+                                  <span className="font-medium">
+                                    Alasan ditolak:
+                                  </span>{" "}
+                                  {r.catatan}
+                                </div>
+                              ) : null}
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {isPending ? (
+                            {extPending ? (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => void approvePerpanjangan(r)}
+                                  disabled={mutatingId === r.id}
+                                  className="inline-flex h-9 items-center rounded-lg bg-emerald-600 px-3 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Setujui Perpanjangan
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    openRejectModal(r, "PERPANJANGAN")
+                                  }
+                                  disabled={mutatingId === r.id}
+                                  className="inline-flex h-9 items-center rounded-lg bg-red-600 px-3 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Tolak Perpanjangan
+                                </button>
+                              </div>
+                            ) : isPending ? (
                               <div className="flex items-center gap-2">
                                 <button
                                   type="button"
@@ -648,7 +897,7 @@ export default function AdminBorrowedBookRequestsPage() {
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => reject(r)}
+                                  onClick={() => openRejectModal(r, "PINJAMAN")}
                                   disabled={mutatingId === r.id}
                                   className="inline-flex h-9 items-center rounded-lg bg-red-600 px-3 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
@@ -776,6 +1025,67 @@ export default function AdminBorrowedBookRequestsPage() {
                   className="h-10 px-4 rounded-xl bg-slate-900 text-white font-medium hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submitting ? "Menyimpan…" : "Setujui"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {rejectOpen ? (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-6"
+            role="dialog"
+            aria-modal="true"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) closeRejectModal();
+            }}
+          >
+            <div className="w-full max-w-md rounded-2xl bg-white border p-6 shadow-lg">
+              <div className="text-lg font-semibold text-slate-900">
+                {rejectMode === "PINJAMAN"
+                  ? "Tolak Peminjaman"
+                  : "Tolak Perpanjangan"}
+              </div>
+
+              <p className="mt-2 text-sm text-slate-600">
+                Alasan penolakan ini akan ditampilkan ke pengguna di riwayat
+                peminjaman.
+              </p>
+
+              <ErrorMessage error={rejectError} className="mt-4" />
+
+              <div className="mt-4">
+                <label className="block text-sm text-slate-700 mb-2">
+                  Alasan Penolakan
+                </label>
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="Contoh: Buku sedang dalam perbaikan sehingga belum bisa dipinjam."
+                  rows={4}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-black"
+                  disabled={rejectSubmitting}
+                />
+              </div>
+
+              <div className="mt-6 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  className="h-10 px-4 rounded-xl border border-slate-300 bg-white text-slate-900 font-medium hover:bg-slate-50"
+                  onClick={() => closeRejectModal()}
+                  disabled={rejectSubmitting}
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void submitReject()}
+                  disabled={
+                    rejectSubmitting || !rejectRow || !rejectReason.trim()
+                  }
+                  className="h-10 px-4 rounded-xl bg-red-600 text-white font-medium hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {rejectSubmitting ? "Menyimpan…" : "Tolak"}
                 </button>
               </div>
             </div>
