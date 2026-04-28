@@ -122,7 +122,7 @@ export default function KoleksiFilter({
         <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
           Filter
         </p>
-        {(selectedCategory || selectedTahun !== "Semua" || selectedKetersediaan !== "Semua" || selectedSubjeks.length > 0) && onResetFilters && (
+        {(selectedCategory || selectedTahun.length > 0 || selectedKetersediaan !== "Semua" || selectedSubjeks.length > 0) && onResetFilters && (
           <button
             onClick={onResetFilters}
             className="text-xs font-medium text-slate-500 hover:text-[#6b3a22] transition"
