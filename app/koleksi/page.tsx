@@ -28,11 +28,11 @@ export default function KoleksiPage() {
   // Filter state
   const [filterKategori, setFilterKategori] = useState("");
   const [filterKetersediaan, setFilterKetersediaan] = useState("Semua");
-  const [filterTahun, setFilterTahun] = useState("Semua");
+  const [filterTahun, setFilterTahun] = useState<string[]>([]);
   const [filterSubjeks, setFilterSubjeks] = useState<string[]>([]);
 
   const loadData = useCallback(
-    async (kw: string, pg: number, kategori: string, tahun: string, subjeks: string[]) => {
+    async (kw: string, pg: number, kategori: string, ketersediaan: string, tahun: string[], subjeks: string[]) => {
       setIsLoading(true);
       try {
         const res = await fetchKoleksi({
@@ -40,7 +40,8 @@ export default function KoleksiPage() {
           page: pg,
           limit: PER_PAGE,
           category: kategori || undefined,
-          tahun: tahun !== "Semua" ? tahun : undefined,
+          ketersediaan: ketersediaan !== "Semua" ? ketersediaan : undefined,
+          tahun: tahun.length > 0 ? tahun : undefined,
           subjek: subjeks.length > 0 ? subjeks : undefined,
         });
         setRows(res.data);
@@ -58,8 +59,8 @@ export default function KoleksiPage() {
   );
 
   useEffect(() => {
-    loadData(keyword, page, filterKategori, filterTahun, filterSubjeks);
-  }, [keyword, page, filterKategori, filterTahun, filterSubjeks, loadData]);
+    loadData(keyword, page, filterKategori, filterKetersediaan, filterTahun, filterSubjeks);
+  }, [keyword, page, filterKategori, filterKetersediaan, filterTahun, filterSubjeks, loadData]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -69,11 +70,6 @@ export default function KoleksiPage() {
 
   function handleCategoryChange(category: string) {
     setFilterKategori(category);
-    setPage(1);
-  }
-
-  function handleTahunChange(tahun: string) {
-    setFilterTahun(tahun);
     setPage(1);
   }
 
@@ -89,10 +85,22 @@ export default function KoleksiPage() {
     setPage(1);
   }
 
+  function handleTahunChange(tahun: string) {
+    // Toggle tahun selection (add or remove)
+    setFilterTahun((prev) => {
+      if (prev.includes(tahun)) {
+        return prev.filter((t) => t !== tahun);
+      } else {
+        return [...prev, tahun];
+      }
+    });
+    setPage(1);
+  }
+
   function handleResetFilters() {
     setFilterKategori("");
     setFilterKetersediaan("Semua");
-    setFilterTahun("Semua");
+    setFilterTahun([]);
     setFilterSubjeks([]);
     setPage(1);
   }

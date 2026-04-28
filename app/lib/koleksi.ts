@@ -66,8 +66,9 @@ export async function fetchKoleksi(opts: {
   page?: number;
   limit?: number;
   category?: string;
-  tahun?: string | number;
+  tahun?: string | number | (string | number)[];
   subjek?: string | string[];
+  ketersediaan?: string;
 }): Promise<KoleksiResponse> {
   const qs = new URLSearchParams();
   
@@ -75,7 +76,13 @@ export async function fetchKoleksi(opts: {
   if (opts.page) qs.set('page', String(opts.page));
   if (opts.limit) qs.set('limit', String(opts.limit));
   if (opts.category) qs.set('category', opts.category);
-  if (opts.tahun) qs.set('tahun', String(opts.tahun));
+  if (opts.ketersediaan) qs.set('ketersediaan', opts.ketersediaan);
+  
+  // Handle multiple tahun values
+  if (opts.tahun) {
+    const tahunArray = Array.isArray(opts.tahun) ? opts.tahun : [opts.tahun];
+    tahunArray.forEach((t) => qs.append('tahun', String(t)));
+  }
   
   // Handle multiple subjek values
   if (opts.subjek) {

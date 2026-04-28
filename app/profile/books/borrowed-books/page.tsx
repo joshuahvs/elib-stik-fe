@@ -677,8 +677,8 @@ export default function BorrowedBooksPage() {
           page,
           limit: pageSize,
           status: filterStatus || undefined,
-          sortBy: sortBy === "due-date" ? "due-date" : undefined,
-          sortOrder: sortBy === "due-date" ? sortOrder : undefined,
+          sortBy: sortBy || undefined,
+          sortOrder: sortOrder,
         });
 
         const mapped = (res.items ?? []).map(mapLoanToBorrowedBook);

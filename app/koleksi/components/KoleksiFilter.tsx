@@ -13,7 +13,7 @@ interface KoleksiFilterProps {
   onCategoryChange: (category: string) => void;
   selectedKetersediaan: string;
   onKetersediaanChange: (ketersediaan: string) => void;
-  selectedTahun: string;
+  selectedTahun: string[];
   onTahunChange: (tahun: string) => void;
   selectedSubjeks: string[];
   onSubjekChange: (subjek: string) => void;
@@ -122,7 +122,7 @@ export default function KoleksiFilter({
         <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
           Filter
         </p>
-        {(selectedCategory || selectedTahun !== "Semua" || selectedKetersediaan !== "Semua" || selectedSubjeks.length > 0) && onResetFilters && (
+        {(selectedCategory || selectedTahun.length > 0 || selectedKetersediaan !== "Semua" || selectedSubjeks.length > 0) && onResetFilters && (
           <button
             onClick={onResetFilters}
             className="text-xs font-medium text-slate-500 hover:text-[#6b3a22] transition"
@@ -165,22 +165,46 @@ export default function KoleksiFilter({
           </select>
         </div>
 
-        {/* Tahun Terbit */}
+        {/* Tahun Terbit - Multi-select like Subjek */}
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-slate-500">Tahun Terbit</label>
-          <select
-            value={selectedTahun}
-            onChange={(e) => onTahunChange(e.target.value)}
-            className={selectClass}
-            disabled={isLoadingYears}
-          >
-            <option value="Semua">Semua Tahun</option>
-            {years.map((year) => (
-              <option key={year} value={year.toString()}>
-                {year}
-              </option>
-            ))}
-          </select>
+          <div className="border border-slate-300 rounded-md px-3 py-2 bg-white cursor-pointer hover:border-slate-400 transition" onClick={() => {
+            const tahunList = document.getElementById('tahun-dropdown');
+            if (tahunList) tahunList.classList.toggle('hidden');
+          }}>
+            {selectedTahun.length === 0 ? (
+              <span className="text-slate-500 text-sm">Semua Tahun</span>
+            ) : (
+              <span className="text-sm">{selectedTahun.length} tahun dipilih</span>
+            )}
+          </div>
+          <div id="tahun-dropdown" className="hidden absolute z-10 mt-1 w-48 rounded-md border border-slate-300 bg-white shadow-lg">
+            {isLoadingYears ? (
+              <div className="px-3 py-2 text-xs text-slate-500">Loading...</div>
+            ) : (
+              <div className="max-h-48 overflow-y-auto">
+                {years.map((year) => {
+                  const isSelected = selectedTahun.includes(year.toString());
+                  return (
+                    <button
+                      key={year}
+                      onClick={() => onTahunChange(year.toString())}
+                      className={`w-full text-left px-3 py-2 text-sm transition ${
+                        isSelected
+                          ? 'bg-[#6b3a22]/20 text-[#6b3a22] font-medium'
+                          : 'text-slate-700 hover:bg-[#6b3a22]/10'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        {isSelected && <span className="text-green-600">✓</span>}
+                        {year}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Subjek Dropdown - Grouped (Count >= 5) */}
@@ -286,16 +310,18 @@ export default function KoleksiFilter({
             </button>
           </span>
         )}
-        {selectedTahun !== "Semua" && (
-          <span className="flex items-center gap-1 rounded-full bg-[#6b3a22]/10 px-3 py-1 text-xs font-medium text-[#6b3a22]">
-            {selectedTahun}
-            <button
-              onClick={() => onTahunChange("Semua")}
-              className="ml-1 leading-none hover:text-[#6b3a22]/70"
-            >
-              ×
-            </button>
-          </span>
+        {selectedTahun.length > 0 && (
+          selectedTahun.map((tahun) => (
+            <span key={tahun} className="flex items-center gap-1 rounded-full bg-[#6b3a22]/10 px-3 py-1 text-xs font-medium text-[#6b3a22]">
+              {tahun}
+              <button
+                onClick={() => onTahunChange(tahun)}
+                className="ml-1 leading-none hover:text-[#6b3a22]/70"
+              >
+                ×
+              </button>
+            </span>
+          ))
         )}
         {selectedSubjeks.length > 0 && (
           <span className="flex items-center gap-1 rounded-full bg-[#6b3a22]/10 px-3 py-1 text-xs font-medium text-[#6b3a22]">
