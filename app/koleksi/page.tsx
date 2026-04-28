@@ -73,11 +73,6 @@ export default function KoleksiPage() {
     setPage(1);
   }
 
-  function handleTahunChange(tahun: string) {
-    setFilterTahun(tahun);
-    setPage(1);
-  }
-
   function handleSubjekChange(subjek: string) {
     // Toggle subjek selection (add or remove)
     setFilterSubjeks((prev) => {
