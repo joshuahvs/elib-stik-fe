@@ -324,6 +324,13 @@ export default function Navbar({ items }: NavbarProps) {
                       Kelola Antarmuka
                     </Link>
                     <Link
+                      href="/admin/blogs"
+                      className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                      onClick={() => setAdminOpen(false)}
+                    >
+                      Manajemen Blog
+                    </Link>
+                    <Link
                       href="/admin/users"
                       className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
                       onClick={() => setAdminOpen(false)}
