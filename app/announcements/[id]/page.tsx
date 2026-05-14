@@ -9,6 +9,19 @@ async function getAnnouncement(id: string) {
   return res.json();
 }
 
+function formatAnnouncementDate(raw?: string | null) {
+  if (!raw) return "-";
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return String(raw);
+
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Jakarta",
+  }).format(date);
+}
+
 export default async function AnnouncementDetail({
   params,
 }: {
@@ -28,11 +41,8 @@ export default async function AnnouncementDetail({
 
   return (
     <main className="bg-gray-100 min-h-screen py-20">
-
       <div className="max-w-2xl mx-auto px-6">
-
         <div className="bg-white rounded-2xl shadow-md p-10">
-
           {/* LABEL */}
           <span className="text-xs bg-orange-100 text-orange-700 px-3 py-1 rounded-full">
             Pengumuman
@@ -45,7 +55,9 @@ export default async function AnnouncementDetail({
 
           {/* DATE */}
           <p className="text-sm text-gray-400 mt-2">
-            {data.date}
+            {formatAnnouncementDate(
+              data?.published_at ?? data?.created_at ?? data?.date ?? null,
+            )}
           </p>
 
           {/* DIVIDER */}
@@ -55,11 +67,8 @@ export default async function AnnouncementDetail({
           <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
             {data.content}
           </div>
-
         </div>
-
       </div>
-
     </main>
   );
 }

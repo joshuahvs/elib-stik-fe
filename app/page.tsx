@@ -19,17 +19,39 @@ async function getBlogs() {
   return res.json();
 }
 
-async function getAnnouncements() {
-  const res = await fetch(`${API_URL}/announcements`, {
+async function getAnnouncements(limit?: number) {
+  const url =
+    typeof limit === "number"
+      ? `${API_URL}/announcements?limit=${limit}`
+      : `${API_URL}/announcements`;
+
+  const res = await fetch(url, {
     cache: "no-store",
   });
-  return res.json();
+
+  const data = await res.json().catch(() => null);
+  if (!res.ok) return [];
+  if (Array.isArray(data)) return data;
+  return (data?.data ?? []) as any[];
 }
 
 function formatBlogDate(iso?: string | null) {
   if (!iso) return null;
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
+
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Jakarta",
+  }).format(date);
+}
+
+function formatAnnouncementDate(raw?: string | null) {
+  if (!raw) return null;
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return String(raw);
 
   return new Intl.DateTimeFormat("id-ID", {
     day: "2-digit",
@@ -69,7 +91,7 @@ export default async function Home() {
   const [data, blogs, announcements] = await Promise.all([
     getLanding(),
     getBlogs(),
-    getAnnouncements(),
+    getAnnouncements(3),
   ]);
   const insights = normalizeInsights(blogs);
 
@@ -178,27 +200,33 @@ export default async function Home() {
           </h2>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {announcements.map((item: any) => (
-              <Link
-                key={item.id}
-                href={`/announcements/${item.id}`}
-                className="group bg-white border rounded-xl p-6 shadow-sm hover:shadow-xl transition"
-              >
-                <div className="mb-3 text-xs text-[#D97706] font-semibold">
-                  ANNOUNCEMENT
-                </div>
+            {announcements.map((item: any) => {
+              const dateValue =
+                item?.published_at ?? item?.created_at ?? item?.date ?? null;
+              const dateLabel = formatAnnouncementDate(dateValue);
 
-                <h3 className="font-semibold text-lg mb-2 group-hover:text-[#512F16] transition">
-                  {item.title}
-                </h3>
+              return (
+                <Link
+                  key={item.id}
+                  href={`/announcements/${item.id}`}
+                  className="group bg-white border rounded-xl p-6 shadow-sm hover:shadow-xl transition"
+                >
+                  <div className="mb-3 text-xs text-[#D97706] font-semibold">
+                    ANNOUNCEMENT
+                  </div>
 
-                <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                  {item.content}
-                </p>
+                  <h3 className="font-semibold text-lg mb-2 group-hover:text-[#512F16] transition">
+                    {item.title}
+                  </h3>
 
-                <p className="text-xs text-gray-400">{item.date}</p>
-              </Link>
-            ))}
+                  <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+                    {item.content}
+                  </p>
+
+                  <p className="text-xs text-gray-400">{dateLabel ?? "-"}</p>
+                </Link>
+              );
+            })}
           </div>
 
           <div className="text-center mt-12">
