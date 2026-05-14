@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { API_URL } from "@/app/lib/api";
 
 type DetailResult =
