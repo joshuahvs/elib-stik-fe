@@ -198,7 +198,9 @@ export default function KunjunganPage() {
               </div>
 
               <div>
-                <label className="block text-sm mb-2 text-white/90">Nama</label>
+                <label className="block text-sm mb-2 text-white/90">
+                  Nama <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   value={nama}

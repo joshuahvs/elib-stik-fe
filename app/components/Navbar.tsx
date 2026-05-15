@@ -317,6 +317,13 @@ export default function Navbar({ items }: NavbarProps) {
                       Riwayat Login Pengguna
                     </Link>
                     <Link
+                      href="/admin/kunjungan"
+                      className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                      onClick={() => setAdminOpen(false)}
+                    >
+                      Riwayat Kunjungan
+                    </Link>
+                    <Link
                       href="/admin/landing-content"
                       className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
                       onClick={() => setAdminOpen(false)}
@@ -343,6 +350,13 @@ export default function Navbar({ items }: NavbarProps) {
                       onClick={() => setAdminOpen(false)}
                     >
                       Tambah Buku
+                    </Link>
+                    <Link
+                      href="/admin/books/archive"
+                      className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                      onClick={() => setAdminOpen(false)}
+                    >
+                      Arsip Buku
                     </Link>
                   </div>
                 </>
