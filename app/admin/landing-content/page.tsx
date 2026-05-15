@@ -10,6 +10,7 @@ import { API_URL } from "@/app/lib/api";
 import {
   fetchAdminLandingContent,
   updateAdminLandingContent,
+  type LandingSection,
   type LandingContent,
 } from "@/app/lib/adminLandingContent";
 
@@ -67,6 +68,21 @@ export default function AdminLandingContentPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
 
+  const [sections, setSections] = useState<LandingSection[]>([]);
+  const [initialSnapshot, setInitialSnapshot] = useState<{
+    title: string;
+    subtitle: string;
+    vision: string;
+    mission: string;
+    imageUrl: string;
+  }>({
+    title: "",
+    subtitle: "",
+    vision: "",
+    mission: "",
+    imageUrl: "",
+  });
+
   const [title, setTitle] = useState<string>("");
   const [subtitle, setSubtitle] = useState<string>("");
   const [vision, setVision] = useState<string>("");
@@ -100,6 +116,14 @@ export default function AdminLandingContentPage() {
     setVision(String(data?.vision ?? ""));
     setMission(String(data?.mission ?? ""));
     setImageUrl(String(data?.image_url ?? ""));
+
+    setInitialSnapshot({
+      title: String(data?.title ?? ""),
+      subtitle: String(data?.subtitle ?? ""),
+      vision: String(data?.vision ?? ""),
+      mission: String(data?.mission ?? ""),
+      imageUrl: String(data?.image_url ?? ""),
+    });
   }
 
   async function load() {
@@ -110,7 +134,8 @@ export default function AdminLandingContentPage() {
 
     try {
       const data = await fetchAdminLandingContent({ token });
-      applyToForm(data);
+      applyToForm(data.content);
+      setSections(data.sections);
     } catch (e: any) {
       setError(getErrorMessage(e, "Gagal memuat konten landing"));
     } finally {
@@ -141,6 +166,16 @@ export default function AdminLandingContentPage() {
     };
   }, [vision, mission]);
 
+  const hasChanges = useMemo(() => {
+    return (
+      title !== initialSnapshot.title ||
+      subtitle !== initialSnapshot.subtitle ||
+      vision !== initialSnapshot.vision ||
+      mission !== initialSnapshot.mission ||
+      imageUrl !== initialSnapshot.imageUrl
+    );
+  }, [title, subtitle, vision, mission, imageUrl, initialSnapshot]);
+
   async function submit() {
     if (!token) return;
 
@@ -161,10 +196,13 @@ export default function AdminLandingContentPage() {
       image_url: normalizeOptionalText(imageUrl),
     };
 
+    if (!hasChanges) return;
+
     try {
       setSubmitting(true);
       const updated = await updateAdminLandingContent({ token, payload });
-      applyToForm(updated);
+      applyToForm(updated.content);
+      setSections(updated.sections);
       setSubmitSuccess("Konten landing berhasil disimpan.");
     } catch (e: any) {
       setSubmitError(getErrorMessage(e, "Gagal menyimpan konten landing"));
@@ -177,7 +215,6 @@ export default function AdminLandingContentPage() {
 
   return (
     <div className="min-h-screen bg-white">
-
       <main className="mx-auto max-w-[1100px] px-6 py-10">
         {!meLoading && !token ? (
           <div className="bg-white rounded-2xl shadow-xl p-8 md:p-10 max-w-xl mx-auto text-center">
@@ -213,6 +250,53 @@ export default function AdminLandingContentPage() {
             </div>
 
             <ErrorMessage error={error} className="mb-6" />
+
+            <section className="rounded-2xl border p-6 mb-8">
+              <h2 className="text-lg font-semibold text-slate-900 mb-4">
+                Daftar Section Landing Page
+              </h2>
+
+              {sections.length === 0 ? (
+                <p className="text-sm text-slate-600">Belum ada section.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-slate-50 text-slate-700">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-semibold">
+                          Section
+                        </th>
+                        <th className="px-4 py-3 text-left font-semibold">
+                          Field
+                        </th>
+                        <th className="px-4 py-3 text-left font-semibold">
+                          Nilai
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {sections.flatMap((section) =>
+                        (section.fields ?? []).map((field, idx) => (
+                          <tr key={`${section.name}-${field.key}-${idx}`}>
+                            <td className="px-4 py-3 align-top text-slate-900 font-medium">
+                              {section.name}
+                            </td>
+                            <td className="px-4 py-3 align-top text-slate-700">
+                              {field.key}
+                            </td>
+                            <td className="px-4 py-3 align-top text-slate-700 whitespace-pre-line break-words">
+                              {field.value && String(field.value).trim()
+                                ? String(field.value)
+                                : "-"}
+                            </td>
+                          </tr>
+                        )),
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
               <section className="rounded-2xl border p-6">
@@ -319,7 +403,7 @@ export default function AdminLandingContentPage() {
                 <PrimaryButton
                   type="button"
                   onClick={submit}
-                  disabled={disabled || submitting}
+                  disabled={disabled || submitting || !hasChanges}
                   className="md:col-span-1"
                 >
                   {submitting ? "Menyimpan..." : "Simpan Perubahan"}

@@ -215,14 +215,17 @@ export default function UploadSkripsiPage() {
     };
   }, [token, meLoading, canUpload]);
 
+  const currentYear = useMemo(() => new Date().getFullYear(), []);
+
   const tahunError = useMemo(() => {
     const s = tahun.trim();
     if (!s) return null;
     if (!/^\d{4}$/.test(s)) return "Tahun harus 4 digit (YYYY)";
     const n = Number(s);
-    if (!Number.isFinite(n) || n < 1900 || n > 2100) return "Tahun tidak valid";
+    if (!Number.isFinite(n) || n < 1900) return "Tahun tidak valid";
+    if (n > currentYear) return "Tahun tidak boleh lebih dari tahun ini";
     return null;
-  }, [tahun]);
+  }, [tahun, currentYear]);
 
   function onPickFile() {
     if (uploadActionsDisabled) return;

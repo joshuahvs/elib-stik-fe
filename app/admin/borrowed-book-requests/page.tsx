@@ -8,9 +8,9 @@ import {
   fetchAdminPeminjamanBuku,
   setujuiPerpanjanganByAdmin,
   tolakPerpanjanganByAdmin,
+  transitionPeminjamanStatusByAdmin,
   updatePeminjamanBukuByAdmin,
 } from "@/app/lib/peminjamanBuku";
-import Dropdown from "@/app/components/DropDown";
 import ErrorMessage, { getErrorMessage } from "@/app/components/ErrorMessage";
 
 function getRole(me: any): string | undefined {
@@ -39,14 +39,6 @@ function toIsoDate(value: any): string {
   return "";
 }
 
-function todayIsoLocal(): string {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
 function formatDate(isoDate: string) {
   if (!isoDate) return "-";
   const d = new Date(`${isoDate}T00:00:00`);
@@ -66,18 +58,6 @@ function statusLabel(statusRaw: any): string {
   if (s === "DIPINJAM" || s === "DIAMBIL") return "Diambil";
   if (s === "DIKEMBALIKAN") return "Dikembalikan";
   return String(statusRaw ?? "-");
-}
-
-function statusFromLabel(label: string): string {
-  const s = String(label ?? "")
-    .trim()
-    .toUpperCase();
-  if (s === "DISETUJUI") return "DISETUJUI";
-  if (s === "DIAMBIL" || s === "DIPINJAM") return "DIPINJAM";
-  if (s === "DIKEMBALIKAN") return "DIKEMBALIKAN";
-  if (s === "DITOLAK") return "DITOLAK";
-  if (s === "DIAJUKAN") return "DIAJUKAN";
-  return s;
 }
 
 function statusBadgeClass(statusRaw: any): string {
@@ -163,6 +143,20 @@ type AdminLoanRow = {
   bukuJudul: string;
   userId: string | null;
   userName: string | null;
+};
+
+type ToastState = {
+  tone: "success" | "error";
+  message: string;
+};
+
+type ConfirmTransitionState = {
+  row: AdminLoanRow;
+  nextStatus: "DIPINJAM" | "DIKEMBALIKAN";
+  title: string;
+  description: string;
+  confirmLabel: string;
+  successMessage: string;
 };
 
 function mapAdminLoan(row: any): AdminLoanRow {
@@ -294,7 +288,19 @@ export default function AdminBorrowedBookRequestsPage() {
   const [rejectError, setRejectError] = useState<string | null>(null);
 
   const [mutatingId, setMutatingId] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const [confirmTransition, setConfirmTransition] =
+    useState<ConfirmTransitionState | null>(null);
+
+  function showToast(tone: ToastState["tone"], message: string) {
+    setToast({ tone, message });
+  }
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 3600);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   useEffect(() => {
     const t = localStorage.getItem("token");
@@ -322,7 +328,7 @@ export default function AdminBorrowedBookRequestsPage() {
 
     setIsLoading(true);
     setError(null);
-    setActionError(null);
+    setToast(null);
 
     try {
       const res = await fetchAdminPeminjamanBuku({
@@ -480,39 +486,65 @@ export default function AdminBorrowedBookRequestsPage() {
     }
   }
 
-  async function setStatus(opts: {
-    rowId: string;
-    prevStatus: string;
-    nextStatus: string;
-  }) {
+  async function transitionStatus(
+    row: AdminLoanRow,
+    nextStatus: "DIPINJAM" | "DIKEMBALIKAN",
+    successMessage: string,
+  ) {
     if (!token) return;
 
-    const prev = opts.prevStatus;
-    const next = opts.nextStatus;
-    if (!next || next === prev) return;
-
-    setRows((current) =>
-      current.map((r) => (r.id === opts.rowId ? { ...r, status: next } : r)),
-    );
-
     try {
-      setMutatingId(opts.rowId);
-      setActionError(null);
-      await updatePeminjamanBukuByAdmin({
+      setMutatingId(row.id);
+      setToast(null);
+
+      const response = await transitionPeminjamanStatusByAdmin({
         token,
-        id: opts.rowId,
-        status: next,
-        tanggal_pengembalian:
-          next === "DIKEMBALIKAN" ? todayIsoLocal() : undefined,
+        id: row.id,
+        status: nextStatus,
       });
-    } catch (e) {
+
+      const updated = mapAdminLoan(response?.data ?? response);
       setRows((current) =>
-        current.map((r) => (r.id === opts.rowId ? { ...r, status: prev } : r)),
+        current.map((r) => (r.id === row.id ? { ...r, ...updated } : r)),
       );
-      setActionError(getErrorMessage(e, "Gagal mengubah status peminjaman"));
+      showToast("success", successMessage);
+    } catch (e) {
+      showToast(
+        "error",
+        getErrorMessage(e, "Gagal mengubah status peminjaman"),
+      );
     } finally {
       setMutatingId(null);
+      setConfirmTransition(null);
     }
+  }
+
+  function openTransitionConfirm(
+    row: AdminLoanRow,
+    nextStatus: "DIPINJAM" | "DIKEMBALIKAN",
+  ) {
+    if (nextStatus === "DIPINJAM") {
+      setConfirmTransition({
+        row,
+        nextStatus,
+        title: "Konfirmasi Pengambilan Buku",
+        description:
+          "Pinjaman ini akan ditandai sebagai telah diambil oleh peminjam.",
+        confirmLabel: "Ya, Tandai Diambil",
+        successMessage: "Status berhasil diubah menjadi Diambil",
+      });
+      return;
+    }
+
+    setConfirmTransition({
+      row,
+      nextStatus,
+      title: "Konfirmasi Pengembalian Buku",
+      description:
+        "Pinjaman ini akan ditandai sebagai telah dikembalikan dan stok buku akan bertambah.",
+      confirmLabel: "Ya, Tandai Dikembalikan",
+      successMessage: "Status berhasil diubah menjadi Dikembalikan",
+    });
   }
 
   async function submitReject() {
@@ -526,7 +558,7 @@ export default function AdminBorrowedBookRequestsPage() {
     try {
       setRejectSubmitting(true);
       setRejectError(null);
-      setActionError(null);
+      setToast(null);
       setMutatingId(rejectRow.id);
 
       if (rejectMode === "PINJAMAN") {
@@ -569,6 +601,12 @@ export default function AdminBorrowedBookRequestsPage() {
       }
 
       closeRejectModal(true);
+      showToast(
+        "success",
+        rejectMode === "PINJAMAN"
+          ? "Peminjaman berhasil ditolak"
+          : "Perpanjangan berhasil ditolak",
+      );
     } catch (e) {
       setRejectError(
         getErrorMessage(
@@ -589,7 +627,7 @@ export default function AdminBorrowedBookRequestsPage() {
 
     try {
       setMutatingId(row.id);
-      setActionError(null);
+      setToast(null);
       await setujuiPerpanjanganByAdmin({ token, id: row.id });
 
       setRows((current) =>
@@ -602,8 +640,9 @@ export default function AdminBorrowedBookRequestsPage() {
             : r,
         ),
       );
+      showToast("success", "Perpanjangan berhasil disetujui");
     } catch (e) {
-      setActionError(getErrorMessage(e, "Gagal menyetujui perpanjangan"));
+      showToast("error", getErrorMessage(e, "Gagal menyetujui perpanjangan"));
     } finally {
       setMutatingId(null);
     }
@@ -678,12 +717,6 @@ export default function AdminBorrowedBookRequestsPage() {
               </button>
             </div>
 
-            {actionError ? (
-              <div className="px-6 pt-6">
-                <ErrorMessage error={actionError} />
-              </div>
-            ) : null}
-
             {error && !isLoading ? (
               <div className="px-6 py-6">
                 <ErrorMessage error={error} />
@@ -746,11 +779,8 @@ export default function AdminBorrowedBookRequestsPage() {
                         (normalizedStatus === "DITOLAK" ||
                           normalizedExt === "DITOLAK");
 
-                      const canEditStatus =
-                        !isPending &&
-                        !isReturned &&
-                        (normalizedStatus === "DISETUJUI" ||
-                          normalizedStatus === "DIPINJAM");
+                      const canMarkPicked = normalizedStatus === "DISETUJUI";
+                      const canMarkReturned = normalizedStatus === "DIPINJAM";
 
                       const resolvedUser =
                         (r.userId ? userNameById[r.userId] : undefined) ??
@@ -785,53 +815,14 @@ export default function AdminBorrowedBookRequestsPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex flex-col items-start gap-2">
-                              {canEditStatus ? (
-                                <div className="w-44">
-                                  <Dropdown
-                                    label="Status"
-                                    labelClassName="sr-only"
-                                    value={statusLabel(normalizedStatus)}
-                                    options={
-                                      normalizedStatus === "DISETUJUI"
-                                        ? [
-                                            statusLabel("DISETUJUI"),
-                                            statusLabel("DIPINJAM"),
-                                            statusLabel("DIKEMBALIKAN"),
-                                          ]
-                                        : [
-                                            statusLabel("DIPINJAM"),
-                                            statusLabel("DIKEMBALIKAN"),
-                                          ]
-                                    }
-                                    onChange={(label) => {
-                                      if (mutatingId === r.id) return;
-                                      const next = statusFromLabel(label);
-                                      void setStatus({
-                                        rowId: r.id,
-                                        prevStatus: normalizedStatus,
-                                        nextStatus: next,
-                                      });
-                                    }}
-                                    buttonClassName={[
-                                      "!rounded-full !px-3 !py-1.5 !text-xs !font-medium !min-h-0",
-                                      statusBadgeClass(normalizedStatus),
-                                      mutatingId === r.id
-                                        ? "opacity-60 pointer-events-none"
-                                        : "",
-                                    ].join(" ")}
-                                    valueClassName="!text-white"
-                                  />
-                                </div>
-                              ) : (
-                                <span
-                                  className={[
-                                    "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
-                                    statusBadgeClass(normalizedStatus),
-                                  ].join(" ")}
-                                >
-                                  {statusLabel(normalizedStatus)}
-                                </span>
-                              )}
+                              <span
+                                className={[
+                                  "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
+                                  statusBadgeClass(normalizedStatus),
+                                ].join(" ")}
+                              >
+                                {statusLabel(normalizedStatus)}
+                              </span>
 
                               {extLabel ? (
                                 <div className="text-xs text-slate-600 whitespace-normal break-words">
@@ -904,6 +895,28 @@ export default function AdminBorrowedBookRequestsPage() {
                                   Tolak
                                 </button>
                               </div>
+                            ) : canMarkPicked ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openTransitionConfirm(r, "DIPINJAM")
+                                }
+                                disabled={mutatingId === r.id}
+                                className="inline-flex h-9 items-center rounded-lg bg-indigo-600 px-3 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                Tandai Telah Diambil
+                              </button>
+                            ) : canMarkReturned ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openTransitionConfirm(r, "DIKEMBALIKAN")
+                                }
+                                disabled={mutatingId === r.id}
+                                className="inline-flex h-9 items-center rounded-lg bg-slate-700 px-3 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                Tandai Telah Dikembalikan
+                              </button>
                             ) : (
                               <span className="text-slate-400">—</span>
                             )}
@@ -1086,6 +1099,117 @@ export default function AdminBorrowedBookRequestsPage() {
                   className="h-10 px-4 rounded-xl bg-red-600 text-white font-medium hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {rejectSubmitting ? "Menyimpan…" : "Tolak"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {confirmTransition ? (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 px-6"
+            role="dialog"
+            aria-modal="true"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget && !mutatingId) {
+                setConfirmTransition(null);
+              }
+            }}
+          >
+            <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 inline-flex h-8 w-8 flex-none items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                  !
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">
+                    {confirmTransition.title}
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {confirmTransition.description}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  className="h-10 px-4 rounded-xl border border-slate-300 bg-white text-slate-900 font-medium hover:bg-slate-50"
+                  onClick={() => setConfirmTransition(null)}
+                  disabled={Boolean(mutatingId)}
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void transitionStatus(
+                      confirmTransition.row,
+                      confirmTransition.nextStatus,
+                      confirmTransition.successMessage,
+                    )
+                  }
+                  disabled={Boolean(mutatingId)}
+                  className="h-10 px-4 rounded-xl bg-slate-900 text-white font-medium hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {mutatingId ? "Menyimpan…" : confirmTransition.confirmLabel}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {toast ? (
+          <div className="fixed right-6 top-6 z-[70] w-full max-w-sm">
+            <div
+              className={[
+                "rounded-2xl border px-4 py-3 shadow-xl backdrop-blur-sm",
+                toast.tone === "success"
+                  ? "border-emerald-200 bg-emerald-50/95"
+                  : "border-rose-200 bg-rose-50/95",
+              ].join(" ")}
+              role="status"
+              aria-live="polite"
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className={[
+                    "mt-0.5 inline-flex h-6 w-6 flex-none items-center justify-center rounded-full text-xs font-bold",
+                    toast.tone === "success"
+                      ? "bg-emerald-600 text-white"
+                      : "bg-rose-600 text-white",
+                  ].join(" ")}
+                >
+                  {toast.tone === "success" ? "✓" : "!"}
+                </div>
+                <div className="flex-1">
+                  <p
+                    className={[
+                      "text-sm font-medium",
+                      toast.tone === "success"
+                        ? "text-emerald-900"
+                        : "text-rose-900",
+                    ].join(" ")}
+                  >
+                    {toast.tone === "success" ? "Berhasil" : "Terjadi Kendala"}
+                  </p>
+                  <p
+                    className={[
+                      "mt-0.5 text-sm",
+                      toast.tone === "success"
+                        ? "text-emerald-800"
+                        : "text-rose-800",
+                    ].join(" ")}
+                  >
+                    {toast.message}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setToast(null)}
+                  className="rounded-md px-2 py-1 text-xs font-medium text-slate-500 hover:bg-white/70 hover:text-slate-700"
+                >
+                  Tutup
                 </button>
               </div>
             </div>

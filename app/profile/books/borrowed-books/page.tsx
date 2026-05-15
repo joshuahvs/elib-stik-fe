@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, Calendar, Minus, Plus, X } from "lucide-react";
-import { fetchDigitalSignedUrl, openInNewTab } from "@/app/lib/booksDigital";
+import { fetchDigitalSignedUrl } from "@/app/lib/booksDigital";
 import {
   ajukanPerpanjanganPeminjaman,
   fetchRiwayatPeminjamanMe,
@@ -438,6 +438,68 @@ function PerpanjanganModal({
   );
 }
 
+type KonfirmasiPerpanjanganModalProps = {
+  open: boolean;
+  judulBuku: string;
+  durasiHari: number;
+  submitting: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+};
+
+function KonfirmasiPerpanjanganModal({
+  open,
+  judulBuku,
+  durasiHari,
+  submitting,
+  onClose,
+  onConfirm,
+}: KonfirmasiPerpanjanganModalProps) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+      <div className="absolute inset-0 bg-slate-900/50" />
+
+      <div className="relative w-full max-w-md rounded-2xl border bg-white p-6 shadow-xl">
+        <h3 className="text-lg font-semibold text-slate-900">
+          Konfirmasi Perpanjangan
+        </h3>
+        <p className="mt-2 text-sm text-slate-600">
+          Ajukan perpanjangan{" "}
+          <span className="font-medium">{durasiHari} hari</span>
+          {judulBuku ? (
+            <>
+              {" "}
+              untuk buku <span className="font-medium">{judulBuku}</span>
+            </>
+          ) : null}
+          ?
+        </p>
+
+        <div className="mt-6 flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            Batal
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={submitting}
+            className="h-10 rounded-lg bg-gradient-to-r from-[#733015] to-[#8b5529] px-4 text-sm font-medium text-white disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {submitting ? "Memproses…" : "Ya, Ajukan"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function BorrowedBooksPage() {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -448,6 +510,14 @@ export default function BorrowedBooksPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const [openingDigitalId, setOpeningDigitalId] = useState<string | null>(null);
+  const [digitalPreviewOpen, setDigitalPreviewOpen] = useState(false);
+  const [digitalPreviewUrl, setDigitalPreviewUrl] = useState<string | null>(
+    null,
+  );
+  const [digitalPreviewTitle, setDigitalPreviewTitle] = useState<string | null>(
+    null,
+  );
+  const [digitalPreviewLoading, setDigitalPreviewLoading] = useState(false);
 
   const [perpanjanganOpen, setPerpanjanganOpen] = useState(false);
   const [perpanjanganLoan, setPerpanjanganLoan] = useState<BorrowedBook | null>(
@@ -457,11 +527,13 @@ export default function BorrowedBooksPage() {
   const [perpanjanganSubmitting, setPerpanjanganSubmitting] =
     useState<boolean>(false);
   const [perpanjanganError, setPerpanjanganError] = useState<unknown>(null);
+  const [konfirmasiPerpanjanganOpen, setKonfirmasiPerpanjanganOpen] =
+    useState<boolean>(false);
 
   // Filter and sort state
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<string>('date');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [sortBy, setSortBy] = useState<string>("date");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   function openPerpanjangan(item: BorrowedBook) {
     setPerpanjanganLoan(item);
@@ -473,8 +545,16 @@ export default function BorrowedBooksPage() {
   function closePerpanjangan(force = false) {
     if (perpanjanganSubmitting && !force) return;
     setPerpanjanganOpen(false);
+    setKonfirmasiPerpanjanganOpen(false);
     setPerpanjanganLoan(null);
     setPerpanjanganError(null);
+  }
+
+  function closeDigitalPreview() {
+    setDigitalPreviewOpen(false);
+    setDigitalPreviewUrl(null);
+    setDigitalPreviewTitle(null);
+    setDigitalPreviewLoading(false);
   }
 
   function handleFilterStatusChange(status: string | null) {
@@ -485,16 +565,21 @@ export default function BorrowedBooksPage() {
   function handleSortChange(newSortBy: string) {
     if (newSortBy === sortBy) {
       // Toggle sort order if same sort field
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
       // New sort field, default to desc
       setSortBy(newSortBy);
-      setSortOrder('desc');
+      setSortOrder("desc");
     }
     setPage(1);
   }
 
-  async function submitPerpanjangan() {
+  function requestSubmitPerpanjangan() {
+    if (!perpanjanganLoan || perpanjanganSubmitting) return;
+    setKonfirmasiPerpanjanganOpen(true);
+  }
+
+  async function submitPerpanjanganConfirmed() {
     const authToken = window.localStorage.getItem("token");
     if (!authToken) {
       window.location.href = "/auth/login";
@@ -522,10 +607,11 @@ export default function BorrowedBooksPage() {
       setActionError(getErrorMessage(e, "Gagal mengajukan perpanjangan"));
     } finally {
       setPerpanjanganSubmitting(false);
+      setKonfirmasiPerpanjanganOpen(false);
     }
   }
 
-  async function handleOpenDigital(digitalId: string) {
+  async function handleOpenDigital(digitalId: string, title?: string) {
     const token = window.localStorage.getItem("token");
     if (!token) {
       window.location.href = "/auth/login";
@@ -535,15 +621,21 @@ export default function BorrowedBooksPage() {
     try {
       setOpeningDigitalId(digitalId);
       setActionError(null);
+      setDigitalPreviewTitle(title ?? "Buku Digital");
+      setDigitalPreviewOpen(true);
+      setDigitalPreviewLoading(true);
+      setDigitalPreviewUrl(null);
       const { signedUrl } = await fetchDigitalSignedUrl({
         token,
         bookId: digitalId,
       });
-      openInNewTab(signedUrl);
+      setDigitalPreviewUrl(signedUrl);
     } catch (e) {
+      closeDigitalPreview();
       setActionError(getErrorMessage(e, "Gagal membuka buku digital"));
     } finally {
       setOpeningDigitalId(null);
+      setDigitalPreviewLoading(false);
     }
   }
 
@@ -578,6 +670,11 @@ export default function BorrowedBooksPage() {
   }, [page, totalPages]);
 
   const now = useMemo(() => new Date(), []);
+
+  const digitalPreviewSrc = useMemo(() => {
+    if (!digitalPreviewUrl) return null;
+    return `${digitalPreviewUrl}#toolbar=0&navpanes=0&scrollbar=0`;
+  }, [digitalPreviewUrl]);
 
   useEffect(() => {
     setToken(window.localStorage.getItem("token"));
@@ -667,9 +764,11 @@ export default function BorrowedBooksPage() {
         <div className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:gap-6">
           {/* Status Filter Dropdown */}
           <div className="flex flex-col gap-2 flex-1">
-            <label className="text-sm font-semibold text-slate-900">Filter Status</label>
+            <label className="text-sm font-semibold text-slate-900">
+              Filter Status
+            </label>
             <select
-              value={filterStatus || ''}
+              value={filterStatus || ""}
               onChange={(e) => handleFilterStatusChange(e.target.value || null)}
               className="px-4 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-900 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#733015]/20 focus:border-[#733015]"
             >
@@ -685,26 +784,28 @@ export default function BorrowedBooksPage() {
 
           {/* Sort Options */}
           <div className="flex flex-col gap-2 flex-1">
-            <label className="text-sm font-semibold text-slate-900">Urutkan Berdasarkan</label>
+            <label className="text-sm font-semibold text-slate-900">
+              Urutkan Berdasarkan
+            </label>
             <div className="flex gap-2">
               {[
-                { label: 'Tanggal Terbaru', value: 'date' },
-                { label: 'Jatuh Tempo', value: 'due-date' },
+                { label: "Tanggal Terbaru", value: "date" },
+                { label: "Jatuh Tempo", value: "due-date" },
               ].map((option) => (
                 <button
                   key={option.value}
                   onClick={() => handleSortChange(option.value)}
                   className={[
-                    'px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2',
+                    "px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2",
                     sortBy === option.value
-                      ? 'bg-gradient-to-r from-[#733015] to-[#8b5529] text-white'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200',
-                  ].join(' ')}
+                      ? "bg-gradient-to-r from-[#733015] to-[#8b5529] text-white"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200",
+                  ].join(" ")}
                 >
                   {option.label}
                   {sortBy === option.value && (
                     <span className="text-xs">
-                      {sortOrder === 'asc' ? '↑' : '↓'}
+                      {sortOrder === "asc" ? "↑" : "↓"}
                     </span>
                   )}
                 </button>
@@ -825,11 +926,11 @@ export default function BorrowedBooksPage() {
                     const dueAt = effectiveDueDate
                       ? new Date(`${effectiveDueDate}T23:59:59`)
                       : null;
-                    const isPastDue =
-                      !isReturned &&
+                    const hasPassedDueDate =
                       dueAt != null &&
                       !Number.isNaN(dueAt.getTime()) &&
                       now > dueAt;
+                    const isPastDue = !isReturned && hasPassedDueDate;
 
                     const overdueDays =
                       isPastDue && until != null ? Math.max(1, -until) : null;
@@ -850,7 +951,8 @@ export default function BorrowedBooksPage() {
 
                     const canRequestExtension =
                       (status === "Dipinjam" || status === "Disetujui") &&
-                      !isPastDue;
+                      !isReturned &&
+                      !hasPassedDueDate;
 
                     return (
                       <tr key={item.id} className="hover:bg-slate-50">
@@ -938,7 +1040,7 @@ export default function BorrowedBooksPage() {
                               <button
                                 type="button"
                                 onClick={() =>
-                                  handleOpenDigital(item.digitalId!)
+                                  handleOpenDigital(item.digitalId!, item.judul)
                                 }
                                 disabled={openingDigitalId === item.digitalId}
                                 className={
@@ -962,7 +1064,7 @@ export default function BorrowedBooksPage() {
                                 ].join(" ")}
                               >
                                 <Calendar className="h-4 w-4" />
-                                Perpanjang
+                                Perpanjangan
                               </button>
                             ) : isPastDue ? (
                               <div className="inline-flex max-w-full items-start gap-1.5 whitespace-normal text-xs text-rose-700">
@@ -1061,8 +1163,67 @@ export default function BorrowedBooksPage() {
           error={perpanjanganError}
           onClose={closePerpanjangan}
           onChangeDurasi={setPerpanjanganDurasi}
-          onSubmit={submitPerpanjangan}
+          onSubmit={requestSubmitPerpanjangan}
         />
+
+        <KonfirmasiPerpanjanganModal
+          open={konfirmasiPerpanjanganOpen}
+          judulBuku={perpanjanganLoan?.judul ?? ""}
+          durasiHari={Math.max(1, Math.min(30, Math.trunc(perpanjanganDurasi)))}
+          submitting={perpanjanganSubmitting}
+          onClose={() => setKonfirmasiPerpanjanganOpen(false)}
+          onConfirm={submitPerpanjanganConfirmed}
+        />
+
+        {digitalPreviewOpen ? (
+          <div
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 px-4"
+            role="dialog"
+            aria-modal="true"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) closeDigitalPreview();
+            }}
+          >
+            <div className="w-full max-w-5xl rounded-2xl bg-white p-5 shadow-xl">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-semibold text-slate-900">
+                    Preview Buku Digital (Read Only)
+                  </h3>
+                  {digitalPreviewTitle ? (
+                    <p className="mt-1 text-xs text-slate-500">
+                      {digitalPreviewTitle}
+                    </p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={closeDigitalPreview}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {digitalPreviewLoading ? (
+                <div className="flex h-[70vh] items-center justify-center text-sm text-slate-500">
+                  Memuat preview...
+                </div>
+              ) : digitalPreviewSrc ? (
+                <iframe
+                  src={digitalPreviewSrc}
+                  title="Preview Buku Digital"
+                  className="h-[70vh] w-full rounded-xl border border-slate-200"
+                  sandbox="allow-same-origin allow-scripts"
+                />
+              ) : (
+                <div className="flex h-[70vh] items-center justify-center rounded-xl border border-dashed border-slate-300 text-sm text-slate-500">
+                  Preview belum tersedia.
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
       </main>
     </div>
   );
