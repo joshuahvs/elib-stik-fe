@@ -131,14 +131,17 @@ export default function EditBookPage() {
     };
   }, [params.id]);
 
+  const currentYear = useMemo(() => new Date().getFullYear(), []);
+
   const tahunError = useMemo(() => {
     const s = tahunTerbit.trim();
     if (!s) return "Tahun terbit wajib diisi";
     if (!/^\d{4}$/.test(s)) return "Tahun harus 4 digit";
     const n = Number(s);
-    if (!Number.isFinite(n) || n < 1900 || n > 2100) return "Tahun tidak valid";
+    if (!Number.isFinite(n) || n < 1900) return "Tahun tidak valid";
+    if (n > currentYear) return "Tahun tidak boleh lebih dari tahun ini";
     return null;
-  }, [tahunTerbit]);
+  }, [tahunTerbit, currentYear]);
 
   const jumlahError = useMemo(() => {
     const s = jumlahEksemplar.trim();
@@ -174,8 +177,7 @@ export default function EditBookPage() {
       !penerbit.trim() ||
       !subjek.trim() ||
       !lokasi.trim() ||
-      !sinopsis.trim() ||
-      !urlSampul.trim()
+      !sinopsis.trim()
     ) {
       setError("Semua field wajib harus diisi.");
       return;
@@ -205,7 +207,7 @@ export default function EditBookPage() {
         lokasi: lokasi.trim(),
         sinopsis: sinopsis.trim(),
         jumlah_eksemplar: jumlahEksemplar.trim(),
-        url_sampul: urlSampul.trim(),
+        url_sampul: urlSampul.trim() ? urlSampul.trim() : null,
         isbn: isbn.trim(),
         bahasa: bahasa.trim(),
       });
@@ -282,11 +284,7 @@ export default function EditBookPage() {
                 disabled={disabled}
               />
 
-              <InputField
-                label="Jenis Koleksi *"
-                value="Buku"
-                disabled
-              />
+              <InputField label="Jenis Koleksi *" value="Buku" disabled />
 
               <InputField
                 label="Penerbit *"
@@ -353,7 +351,7 @@ export default function EditBookPage() {
               />
 
               <InputField
-                label="URL Cover Buku *"
+                label="URL Cover Buku (opsional)"
                 value={urlSampul}
                 onChange={(e) => setUrlSampul(e.target.value)}
                 disabled={disabled}
@@ -408,7 +406,9 @@ export default function EditBookPage() {
             <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">
               <div className="flex justify-between gap-4 py-1">
                 <span>ID Buku</span>
-                <span className="font-semibold text-slate-900">{params.id}</span>
+                <span className="font-semibold text-slate-900">
+                  {params.id}
+                </span>
               </div>
               <div className="flex justify-between gap-4 py-1">
                 <span>Jenis Koleksi</span>

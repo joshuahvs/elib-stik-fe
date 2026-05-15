@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ErrorMessage, { getErrorMessage } from "@/app/components/ErrorMessage";
 import { API_URL } from "@/app/lib/api";
@@ -34,6 +34,17 @@ export default function SkripsiRepositoryPage() {
   const [rows, setRows] = useState<SkripsiRow[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [error, setError] = useState<unknown>(null);
+
+  const currentYear = useMemo(() => new Date().getFullYear(), []);
+  const yearError = useMemo(() => {
+    const s = tahun.trim();
+    if (!s) return null;
+    if (!/^\d{4}$/.test(s)) return "Tahun harus 4 digit (YYYY)";
+    const n = Number(s);
+    if (!Number.isFinite(n) || n < 1900) return "Tahun tidak valid";
+    if (n > currentYear) return "Tahun tidak boleh lebih dari tahun ini";
+    return null;
+  }, [tahun, currentYear]);
 
   useEffect(() => {
     const t = window.localStorage.getItem("token");
@@ -93,7 +104,7 @@ export default function SkripsiRepositoryPage() {
         page,
         limit: PER_PAGE,
         q: keyword || undefined,
-        tahun: tahun.trim() || undefined,
+        tahun: !yearError && tahun.trim() ? tahun.trim() : undefined,
       });
       setRows(res.items);
       setTotalPages(res.totalPages);
@@ -156,6 +167,9 @@ export default function SkripsiRepositoryPage() {
                 maxLength={4}
                 className="h-11 w-full rounded-lg border border-white/20 bg-white/10 px-4 text-sm text-white placeholder:text-white/60 outline-none focus:border-white/50 focus:bg-white/20"
               />
+              {yearError ? (
+                <p className="mt-1 text-xs text-rose-200">{yearError}</p>
+              ) : null}
             </div>
             <button
               type="submit"

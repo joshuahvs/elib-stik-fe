@@ -111,14 +111,17 @@ export default function AdminAddBookPage() {
     };
   }, [router]);
 
+  const currentYear = useMemo(() => new Date().getFullYear(), []);
+
   const tahunError = useMemo(() => {
     const s = tahunTerbit.trim();
     if (!s) return null;
     if (!/^\d{4}$/.test(s)) return "Tahun harus 4 digit (YYYY)";
     const n = Number(s);
-    if (!Number.isFinite(n) || n < 1900 || n > 2100) return "Tahun tidak valid";
+    if (!Number.isFinite(n) || n < 1900) return "Tahun tidak valid";
+    if (n > currentYear) return "Tahun tidak boleh lebih dari tahun ini";
     return null;
-  }, [tahunTerbit]);
+  }, [tahunTerbit, currentYear]);
 
   const jumlahEksemplarError = useMemo(() => {
     const s = jumlahEksemplar.trim();

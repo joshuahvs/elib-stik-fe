@@ -77,7 +77,7 @@ export async function updateAdminBook(opts: {
   lokasi: string;
   sinopsis: string;
   jumlah_eksemplar: string;
-  url_sampul: string;
+  url_sampul?: string | null;
   isbn?: string;
   bahasa?: string;
 }) {
@@ -97,7 +97,7 @@ export async function updateAdminBook(opts: {
       lokasi: opts.lokasi,
       sinopsis: opts.sinopsis,
       jumlah_eksemplar: opts.jumlah_eksemplar,
-      url_sampul: opts.url_sampul,
+      url_sampul: opts.url_sampul ?? null,
       isbn: opts.isbn,
       bahasa: opts.bahasa,
     }),

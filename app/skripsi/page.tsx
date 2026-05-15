@@ -258,6 +258,8 @@ export default function SkripsiListPage() {
                 const statusUi = toUiStatus(row.status);
                 const isPending =
                   String(row.status ?? "").toUpperCase() === "PENDING";
+                const isRejected = statusUi === "Ditolak";
+                const rejectedReason = row.alasan_ditolak?.trim();
                 const penulisTambahan = parsePenulisTambahan(
                   row.penulis_tambahan,
                 );
@@ -288,10 +290,28 @@ export default function SkripsiListPage() {
                           <span className="font-semibold text-slate-700">
                             Abstrak:
                           </span>{" "}
-                          <span className="line-clamp-2">
+                          <span className="whitespace-pre-wrap break-words">
                             {row.abstrak?.trim() || "-"}
                           </span>
                         </p>
+                        {isRejected ? (
+                          <div>
+                            {rejectedReason ? (
+                              <details className="mt-1">
+                                <summary className="cursor-pointer text-xs font-semibold text-rose-700">
+                                  Feedback admin
+                                </summary>
+                                <p className="mt-1 whitespace-pre-wrap break-words text-xs text-rose-700">
+                                  {rejectedReason}
+                                </p>
+                              </details>
+                            ) : (
+                              <p className="mt-1 text-xs text-rose-600">
+                                Feedback admin belum tersedia.
+                              </p>
+                            )}
+                          </div>
+                        ) : null}
                         <div>
                           <span className="font-semibold text-slate-700">
                             Penulis Tambahan:
