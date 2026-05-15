@@ -294,8 +294,6 @@ export default function UploadSkripsiPage() {
     if (!tahunTrim) return setError("Tahun wajib diisi");
     if (tahunError) return setError(tahunError);
     if (!abstrakTrim) return setError("Abstrak wajib diisi");
-    if (!pembimbingTrim) return setError("Pembimbing wajib diisi");
-    if (!pengujiTrim) return setError("Penguji wajib diisi");
 
     for (const [idx, p] of penulisTambahanClean.entries()) {
       if (!p.nim || !p.nama) {
@@ -319,8 +317,8 @@ export default function UploadSkripsiPage() {
         judul: judulTrim,
         tahun: tahunTrim,
         abstrak: abstrakTrim,
-        pembimbing: pembimbingTrim,
-        penguji: pengujiTrim,
+        pembimbing: pembimbingTrim || undefined,
+        penguji: pengujiTrim || undefined,
         penulis_tambahan: penulisTambahanClean,
         file: file as File,
         file_ttd: fileTtd as File,
@@ -448,13 +446,12 @@ export default function UploadSkripsiPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-2 block text-sm text-black">
-                  Pembimbing <span className="text-rose-600">*</span>
+                  Pembimbing
                 </label>
                 <input
                   value={pembimbing}
                   onChange={(e) => setPembimbing(e.target.value)}
                   placeholder="Contoh: Dr. Budi Santoso"
-                  required
                   disabled={submitting || meLoading || !canUpload}
                   className={[
                     "w-full p-3 border rounded-lg transition-colors",
@@ -466,14 +463,11 @@ export default function UploadSkripsiPage() {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm text-black">
-                  Penguji <span className="text-rose-600">*</span>
-                </label>
+                <label className="mb-2 block text-sm text-black">Penguji</label>
                 <input
                   value={penguji}
                   onChange={(e) => setPenguji(e.target.value)}
                   placeholder="Contoh: Prof. Susanto"
-                  required
                   disabled={submitting || meLoading || !canUpload}
                   className={[
                     "w-full p-3 border rounded-lg transition-colors",

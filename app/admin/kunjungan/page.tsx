@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import PrimaryButton from "@/app/components/PrimaryButton";
 import ErrorMessage from "@/app/components/ErrorMessage";
@@ -55,6 +55,15 @@ export default function AdminKunjunganPage() {
   const [endDate, setEndDate] = useState<string>("");
   const [role, setRole] = useState<string>("");
   const [query, setQuery] = useState<string>("");
+  
+  const today = useMemo(() => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+
+    return `${yyyy}-${mm}-${dd}`;
+  }, []);
 
   const [page, setPage] = useState(1);
   const limit = 10;
@@ -194,6 +203,7 @@ export default function AdminKunjunganPage() {
                 <input
                   type="date"
                   value={startDate}
+                  max={today}
                   onChange={(e) => setStartDate(e.target.value)}
                   className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#8B5A3C]"
                 />
@@ -206,6 +216,7 @@ export default function AdminKunjunganPage() {
                 <input
                   type="date"
                   value={endDate}
+                  max={today}
                   onChange={(e) => setEndDate(e.target.value)}
                   className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#8B5A3C]"
                 />

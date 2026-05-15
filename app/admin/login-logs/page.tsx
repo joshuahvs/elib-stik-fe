@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Navbar from "@/app/components/Navbar";
+import { useEffect, useMemo, useState } from "react";
 import PrimaryButton from "@/app/components/PrimaryButton";
 import Link from "next/link";
 import {
@@ -76,6 +75,15 @@ export default function AdminLoginLogsPage() {
   const [status, setStatus] = useState<LoginLogStatus | "">("");
   const [role, setRole] = useState<string>("");
   const [email, setEmail] = useState<string>("");
+
+  const today = useMemo(() => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+
+    return `${yyyy}-${mm}-${dd}`;
+  }, []);
 
   const limit = 200;
 
@@ -176,6 +184,7 @@ export default function AdminLoginLogsPage() {
                 <input
                   type="date"
                   value={from}
+                  max={today}
                   onChange={(e) => setFrom(e.target.value)}
                   className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#8B5A3C]"
                 />
@@ -188,6 +197,7 @@ export default function AdminLoginLogsPage() {
                 <input
                   type="date"
                   value={to}
+                  max={today}
                   onChange={(e) => setTo(e.target.value)}
                   className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#8B5A3C]"
                 />
