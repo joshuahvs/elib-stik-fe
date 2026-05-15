@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { fetchBukuById, type BukuRow } from "@/app/lib/koleksi";
 import { API_URL } from "@/app/lib/api";
-import { fetchDigitalSignedUrl, openInNewTab } from "@/app/lib/booksDigital";
+import { fetchDigitalSignedUrl } from "@/app/lib/booksDigital";
 import { ajukanPeminjamanBuku } from "@/app/lib/peminjamanBuku";
 import ErrorMessage, { getErrorMessage } from "@/app/components/ErrorMessage";
 import { fetchMe } from "@/app/lib/me";
@@ -116,11 +116,16 @@ export default function KoleksiDetailPage() {
   const todayYmd = useMemo(() => formatLocalYmd(new Date()), []);
 
   // Digital
- const [token, setToken] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [digitalMeta, setDigitalMeta] = useState<BookDigitalMeta | null>(null);
   const [opening, setOpening] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
+  const [digitalPreviewOpen, setDigitalPreviewOpen] = useState(false);
+  const [digitalPreviewUrl, setDigitalPreviewUrl] = useState<string | null>(
+    null,
+  );
+  const [digitalPreviewLoading, setDigitalPreviewLoading] = useState(false);
 
   // Loan
   const [submittingLoan, setSubmittingLoan] = useState(false);
@@ -266,6 +271,11 @@ export default function KoleksiDetailPage() {
     return typeof fp === "string" && fp.trim().length > 0;
   }, [book?.file_path, book?.filePath, digitalMeta?.file_path]);
 
+  const digitalPreviewSrc = useMemo(() => {
+    if (!digitalPreviewUrl) return null;
+    return `${digitalPreviewUrl}#toolbar=0&navpanes=0&scrollbar=0`;
+  }, [digitalPreviewUrl]);
+
   const akhirPinjam = useMemo(() => {
     if (!tanggalPinjam) return "";
     const days = Number.isFinite(periodeHari) ? Math.trunc(periodeHari) : 0;
@@ -306,17 +316,28 @@ export default function KoleksiDetailPage() {
     }
     try {
       setOpening(true);
+      setDigitalPreviewLoading(true);
+      setDigitalPreviewOpen(true);
+      setDigitalPreviewUrl(null);
       setPageError(null);
       const { signedUrl } = await fetchDigitalSignedUrl({
         token: t,
         bookId: digitalId,
       });
-      openInNewTab(signedUrl);
+      setDigitalPreviewUrl(signedUrl);
     } catch (e) {
+      closeDigitalPreview();
       setPageError(getErrorMessage(e, "Buku Digital Belum Tersedia"));
     } finally {
       setOpening(false);
+      setDigitalPreviewLoading(false);
     }
+  }
+
+  function closeDigitalPreview() {
+    setDigitalPreviewOpen(false);
+    setDigitalPreviewUrl(null);
+    setDigitalPreviewLoading(false);
   }
 
   function openLoanModal() {
@@ -684,54 +705,57 @@ export default function KoleksiDetailPage() {
                 </div>
 
                 {isAdmin &&
-                  String(book?.jenis_koleksi ?? "").toLowerCase() === "buku" && (
+                  String(book?.jenis_koleksi ?? "").toLowerCase() ===
+                    "buku" && (
                     <div className="flex flex-wrap items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => router.push(`/admin/books/edit/${params.id}`)}
-                      className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          router.push(`/admin/books/edit/${params.id}`)
+                        }
+                        className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M16.862 4.487l1.651-1.651a2.121 2.121 0 013 3L7.5 19.849 3 21l1.151-4.5L16.862 4.487z"
-                        />
-                      </svg>
-                      Perbarui Buku
-                    </button>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M16.862 4.487l1.651-1.651a2.121 2.121 0 013 3L7.5 19.849 3 21l1.151-4.5L16.862 4.487z"
+                          />
+                        </svg>
+                        Perbarui Buku
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => setShowArchiveModal(true)}
-                      disabled={archiving}
-                      className="inline-flex h-10 items-center gap-2 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
+                      <button
+                        type="button"
+                        onClick={() => setShowArchiveModal(true)}
+                        disabled={archiving}
+                        className="inline-flex h-10 items-center gap-2 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4h6v3m-9 0h12"
-                        />
-                      </svg>
-                      {archiving ? "Menghapus..." : "Hapus"}
-                    </button>
-                  </div>
-                )}
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4h6v3m-9 0h12"
+                          />
+                        </svg>
+                        {archiving ? "Menghapus..." : "Hapus"}
+                      </button>
+                    </div>
+                  )}
               </div>
 
               <hr className="my-6 border-slate-200" />
@@ -1216,6 +1240,49 @@ export default function KoleksiDetailPage() {
                   Batal
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {digitalPreviewOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+            role="dialog"
+            aria-modal="true"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) closeDigitalPreview();
+            }}
+          >
+            <div className="w-full max-w-5xl rounded-2xl bg-white p-5 shadow-xl">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-base font-semibold text-slate-900">
+                  Preview Buku Digital (Read Only)
+                </h3>
+                <button
+                  type="button"
+                  onClick={closeDigitalPreview}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  X
+                </button>
+              </div>
+
+              {digitalPreviewLoading ? (
+                <div className="flex h-[70vh] items-center justify-center text-sm text-slate-500">
+                  Memuat preview...
+                </div>
+              ) : digitalPreviewSrc ? (
+                <iframe
+                  src={digitalPreviewSrc}
+                  title="Preview Buku Digital"
+                  className="h-[70vh] w-full rounded-xl border border-slate-200"
+                  sandbox="allow-same-origin allow-scripts"
+                />
+              ) : (
+                <div className="flex h-[70vh] items-center justify-center rounded-xl border border-dashed border-slate-300 text-sm text-slate-500">
+                  Preview belum tersedia.
+                </div>
+              )}
             </div>
           </div>
         )}
