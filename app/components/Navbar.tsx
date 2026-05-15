@@ -53,10 +53,15 @@ export default function Navbar({ items }: NavbarProps) {
   const role = getRole(me);
   const isAdmin = role === "admin";
   const displayName = getDisplayName(me) ?? "Akun";
+  const canAccessRepository =
+    isAuthed && ["admin", "dosen", "mahasiswa"].includes(role ?? "");
 
   const navItems: NavbarItem[] = items ?? [
     { label: "Beranda", href: "/" },
     { label: "Koleksi", href: "/koleksi" },
+    ...(canAccessRepository
+      ? [{ label: "Repositori Skripsi", href: "/skripsi/repository" }]
+      : []),
     ...(isAuthed && role === "mahasiswa"
       ? [{ label: "Lihat Skripsi", href: "/skripsi" }]
       : []),
@@ -328,7 +333,28 @@ export default function Navbar({ items }: NavbarProps) {
                       className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
                       onClick={() => setAdminOpen(false)}
                     >
-                      Konten Landing Page
+                      Kelola Antarmuka
+                    </Link>
+                    <Link
+                      href="/admin/blogs"
+                      className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                      onClick={() => setAdminOpen(false)}
+                    >
+                      Manajemen Blog
+                    </Link>
+                    <Link
+                      href="/admin/announcements"
+                      className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                      onClick={() => setAdminOpen(false)}
+                    >
+                      Manajemen Pengumuman
+                    </Link>
+                    <Link
+                      href="/admin/skripsi"
+                      className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                      onClick={() => setAdminOpen(false)}
+                    >
+                      Kelola Skripsi
                     </Link>
                     <Link
                       href="/admin/users"

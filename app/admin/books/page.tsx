@@ -113,7 +113,7 @@ export default function AdminAddBookPage() {
 
   const tahunError = useMemo(() => {
     const s = tahunTerbit.trim();
-    if (!s) return "Tahun terbit wajib diisi";
+    if (!s) return null;
     if (!/^\d{4}$/.test(s)) return "Tahun harus 4 digit (YYYY)";
     const n = Number(s);
     if (!Number.isFinite(n) || n < 1900 || n > 2100) return "Tahun tidak valid";
@@ -122,7 +122,7 @@ export default function AdminAddBookPage() {
 
   const jumlahEksemplarError = useMemo(() => {
     const s = jumlahEksemplar.trim();
-    if (!s) return "Jumlah eksemplar wajib diisi";
+    if (!s) return null;
     if (!/^\d+$/.test(s)) return "Jumlah eksemplar harus angka bulat";
     const n = Number(s);
     if (!Number.isFinite(n) || n < 0) return "Jumlah eksemplar tidak valid";
@@ -166,23 +166,13 @@ export default function AdminAddBookPage() {
 
     const judulTrim = judul.trim();
     const namaTrim = namaOrang.trim();
-    const penerbitTrim = penerbit.trim();
     const tahunTrim = tahunTerbit.trim();
-    const subjekTrim = subjek.trim();
-    const lokasiTrim = lokasi.trim();
-    const sinopsisTrim = sinopsis.trim();
     const jumlahTrim = jumlahEksemplar.trim();
-    const urlSampulTrim = urlSampul.trim();
 
     if (!judulTrim) return setError("Judul buku wajib diisi");
     if (!namaTrim) return setError("Penulis wajib diisi");
-    if (!penerbitTrim) return setError("Penerbit wajib diisi");
     if (tahunError) return setError(tahunError);
-    if (!subjekTrim) return setError("Kategori wajib diisi");
-    if (!lokasiTrim) return setError("Lokasi rak wajib diisi");
-    if (!sinopsisTrim) return setError("Sinopsis wajib diisi");
     if (jumlahEksemplarError) return setError(jumlahEksemplarError);
-    if (!urlSampulTrim) return setError("URL sampul wajib diisi");
 
     const fileMsg = validatePdfFile(file);
     if (fileMsg) return setError(fileMsg);
@@ -195,13 +185,13 @@ export default function AdminAddBookPage() {
         token,
         judul: judulTrim,
         nama_orang: namaTrim,
-        penerbit: penerbitTrim,
-        tahun_terbit: tahunTrim,
-        subjek: subjekTrim,
-        lokasi: lokasiTrim,
-        sinopsis: sinopsisTrim,
-        jumlah_eksemplar: jumlahTrim,
-        url_sampul: urlSampulTrim,
+        penerbit,
+        tahun_terbit: tahunTrim || undefined,
+        subjek,
+        lokasi,
+        sinopsis,
+        jumlah_eksemplar: jumlahTrim || undefined,
+        url_sampul: urlSampul,
         file: file as File,
       });
 
@@ -261,41 +251,37 @@ export default function AdminAddBookPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <InputField
-                label="Judul Buku *"
+                label="Judul Buku"
                 value={judul}
                 onChange={(e) => setJudul(e.target.value)}
                 placeholder="Masukkan judul buku"
-                required
                 disabled={disabled}
               />
               <InputField
-                label="Penulis *"
+                label="Penulis"
                 value={namaOrang}
                 onChange={(e) => setNamaOrang(e.target.value)}
                 placeholder="Masukkan nama penulis"
-                required
                 disabled={disabled}
               />
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <InputField
-                label="Penerbit *"
+                label="Penerbit"
                 value={penerbit}
                 onChange={(e) => setPenerbit(e.target.value)}
                 placeholder="Masukkan penerbit"
-                required
                 disabled={disabled}
               />
               <div>
                 <InputField
-                  label="Tahun Terbit *"
+                  label="Tahun Terbit"
                   value={tahunTerbit}
                   onChange={(e) => setTahunTerbit(e.target.value)}
                   placeholder="YYYY"
                   inputMode="numeric"
                   maxLength={4}
-                  required
                   disabled={disabled}
                 />
                 {tahunError ? (
@@ -306,19 +292,17 @@ export default function AdminAddBookPage() {
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <InputField
-                label="Kategori *"
+                label="Kategori"
                 value={subjek}
                 onChange={(e) => setSubjek(e.target.value)}
                 placeholder="Contoh: Hukum, Teknologi"
-                required
                 disabled={disabled}
               />
               <InputField
-                label="Lokasi Rak *"
+                label="Lokasi Rak"
                 value={lokasi}
                 onChange={(e) => setLokasi(e.target.value)}
                 placeholder="Contoh: Rak A1"
-                required
                 disabled={disabled}
               />
             </div>
@@ -326,12 +310,11 @@ export default function AdminAddBookPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <InputField
-                  label="Jumlah Eksemplar *"
+                  label="Jumlah Eksemplar"
                   value={jumlahEksemplar}
                   onChange={(e) => setJumlahEksemplar(e.target.value)}
                   placeholder="Contoh: 10"
                   inputMode="numeric"
-                  required
                   disabled={disabled}
                 />
                 {jumlahEksemplarError ? (
@@ -343,15 +326,12 @@ export default function AdminAddBookPage() {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm text-black">
-                Sinopsis <span className="text-rose-600">*</span>
-              </label>
+              <label className="mb-2 block text-sm text-black">Sinopsis</label>
               <textarea
                 value={sinopsis}
                 onChange={(e) => setSinopsis(e.target.value)}
                 placeholder="Masukkan sinopsis buku"
                 rows={4}
-                required
                 disabled={disabled}
                 className={[
                   "w-full rounded-lg border p-3 transition-colors",
@@ -363,11 +343,10 @@ export default function AdminAddBookPage() {
             </div>
 
             <InputField
-              label="URL Sampul *"
+              label="URL Sampul (opsional)"
               value={urlSampul}
               onChange={(e) => setUrlSampul(e.target.value)}
               placeholder="https://..."
-              required
               disabled={disabled}
             />
 
