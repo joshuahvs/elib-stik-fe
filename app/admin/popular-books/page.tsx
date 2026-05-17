@@ -58,7 +58,7 @@ export default function PopularBooksPage() {
         setError(null);
 
         const res = await fetchPopularBooks({
-          token,
+          token: token as string,
           category: selectedCategory || undefined,
           limit: 5,
         });
@@ -94,7 +94,7 @@ export default function PopularBooksPage() {
       setError(null);
 
       const res = await fetchPopularBooks({
-        token,
+        token: token as string,
         category: selectedCategory || undefined,
         limit: 5,
       });
@@ -266,4 +266,5 @@ export default function PopularBooksPage() {
     </div>
   );
 }
+
 
