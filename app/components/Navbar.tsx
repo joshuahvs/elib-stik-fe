@@ -315,6 +315,27 @@ export default function Navbar({ items }: NavbarProps) {
                   <div className="absolute right-0 top-full h-2 w-52 bg-transparent z-40" />
                   <div className="absolute right-0 mt-2 w-52 rounded-xl border bg-white shadow-lg overflow-hidden z-50">
                     <Link
+                      href="/admin/dashboard"
+                      className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 border-b"
+                      onClick={() => setAdminOpen(false)}
+                    >
+                      Dashboard Sirkulasi
+                    </Link>
+                    <Link
+                      href="/admin/loan-trend"
+                      className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 border-b"
+                      onClick={() => setAdminOpen(false)}
+                    >
+                      Visualisasi Tren Peminjaman
+                    </Link>
+                    <Link
+                      href="/admin/popular-books"
+                      className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 border-b"
+                      onClick={() => setAdminOpen(false)}
+                    >
+                      Analisis Buku Populer
+                    </Link>
+                    <Link
                       href="/admin/login-logs"
                       className="block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900"
                       onClick={() => setAdminOpen(false)}
