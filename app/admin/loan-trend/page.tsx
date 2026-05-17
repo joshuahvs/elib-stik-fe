@@ -241,7 +241,7 @@ export default function LoanTrendPage() {
           </p>
         </div>
 
-        {error && <ErrorMessage message={error} />}
+        {error && <ErrorMessage error={error} />}
 
         {/* Filters */}
         <div className="mb-8 bg-[#6b3a22] p-6 rounded-lg border-2 border-[#6b3a22]">

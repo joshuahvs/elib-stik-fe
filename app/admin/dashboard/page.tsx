@@ -227,7 +227,7 @@ export default function DashboardPage() {
           <p className="text-gray-600 mt-2">Ringkasan aktivitas peminjaman hari ini</p>
         </div>
 
-        {error && <ErrorMessage message={error} />}
+        {error && <ErrorMessage error={error} />}
 
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
