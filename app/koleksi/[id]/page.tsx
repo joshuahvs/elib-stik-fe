@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { fetchBukuById, type BukuRow } from "@/app/lib/koleksi";
 import { API_URL } from "@/app/lib/api";
-import { fetchDigitalSignedUrl } from "@/app/lib/booksDigital";
+import { fetchDigitalSignedUrl, openInNewTab } from "@/app/lib/booksDigital";
 import { ajukanPeminjamanBuku } from "@/app/lib/peminjamanBuku";
 import ErrorMessage, { getErrorMessage } from "@/app/components/ErrorMessage";
 import { fetchMe } from "@/app/lib/me";
@@ -1433,4 +1433,3 @@ function DetailItem({
     </div>
   );
 }
-
