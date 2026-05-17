@@ -63,7 +63,7 @@ function buildUploadBlockedMessage(blockingStatus?: string): string {
     return "Kamu sudah mengunggah skripsi dan statusnya masih Pending. Tombol unggah akan aktif setelah pengajuan dibatalkan.";
   }
 
-  return "Mahasiswa hanya dapat mengunggah 1 skripsi (kecuali jika skripsi sebelumnya berstatus Dibatalkan).";
+  return "Mahasiswa hanya dapat mengunggah 1 skripsi (kecuali jika skripsi sebelumnya berstatus Dibatalkan atau Ditolak).";
 }
 
 export default function UploadSkripsiPage() {

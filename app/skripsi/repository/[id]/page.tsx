@@ -128,6 +128,9 @@ export default function SkripsiRepositoryDetailPage() {
 
   useEffect(() => {
     if (!id || !token || !isAllowed || meLoading) return;
+    const authToken = token;
+    const skripsiId = Array.isArray(id) ? id[0] : id;
+    if (!skripsiId) return;
 
     let cancelled = false;
 
@@ -135,7 +138,10 @@ export default function SkripsiRepositoryDetailPage() {
       setIsLoading(true);
       setError(null);
       try {
-        const data = await fetchSkripsiRepositoryDetail({ token, id });
+        const data = await fetchSkripsiRepositoryDetail({
+          token: authToken,
+          id: skripsiId,
+        });
         if (!cancelled) setRow(data);
       } catch (e) {
         if (!cancelled) setError(getErrorMessage(e, "Gagal memuat detail"));
@@ -153,13 +159,19 @@ export default function SkripsiRepositoryDetailPage() {
 
   useEffect(() => {
     if (!id || !token || !isAllowed || meLoading) return;
+    const authToken = token;
+    const skripsiId = Array.isArray(id) ? id[0] : id;
+    if (!skripsiId) return;
 
     let cancelled = false;
 
     async function loadPreview() {
       setPreviewLoading(true);
       try {
-        const res = await fetchSkripsiRepositorySignedUrl({ token, id });
+        const res = await fetchSkripsiRepositorySignedUrl({
+          token: authToken,
+          id: skripsiId,
+        });
         if (!cancelled) setPreviewUrl(res.signedUrl);
       } catch (e) {
         if (!cancelled) setError(getErrorMessage(e, "Gagal memuat preview"));

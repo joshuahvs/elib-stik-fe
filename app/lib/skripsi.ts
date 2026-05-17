@@ -13,6 +13,16 @@ export function isSkripsiCancelledStatus(status: unknown): boolean {
   return s === "DIBATALKAN" || s === "CANCELLED" || s === "CANCELED";
 }
 
+export function isSkripsiResubmittableStatus(status: unknown): boolean {
+  const s = normalizeSkripsiStatus(status);
+  return (
+    s === "DITOLAK" ||
+    s === "DIBATALKAN" ||
+    s === "CANCELLED" ||
+    s === "CANCELED"
+  );
+}
+
 export type SkripsiUser = {
   nama_lengkap?: string | null;
   nim?: string | null;
@@ -50,7 +60,7 @@ export function getSkripsiUploadEligibility(
   items: SkripsiRow[],
 ): SkripsiUploadEligibility {
   for (const row of items ?? []) {
-    if (!isSkripsiCancelledStatus(row?.status)) {
+    if (!isSkripsiResubmittableStatus(row?.status)) {
       const blockingStatus = normalizeSkripsiStatus(row?.status) || "UNKNOWN";
       return { allowed: false, blockingStatus };
     }
