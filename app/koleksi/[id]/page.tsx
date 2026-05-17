@@ -117,6 +117,7 @@ export default function KoleksiDetailPage() {
 
   // Digital
   const [token, setToken] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [digitalMeta, setDigitalMeta] = useState<BookDigitalMeta | null>(null);
   const [opening, setOpening] = useState(false);
@@ -753,6 +754,8 @@ export default function KoleksiDetailPage() {
                 {isAdmin &&
                   String(book?.jenis_koleksi ?? "").toLowerCase() ===
                     "buku" && (
+                  String(book?.jenis_koleksi ?? "").toLowerCase() ===
+                    "buku" && (
                     <div className="flex flex-wrap items-center gap-3">
                       <button
                         type="button"
@@ -777,7 +780,54 @@ export default function KoleksiDetailPage() {
                         </svg>
                         Perbarui Buku
                       </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          router.push(`/admin/books/edit/${params.id}`)
+                        }
+                        className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M16.862 4.487l1.651-1.651a2.121 2.121 0 013 3L7.5 19.849 3 21l1.151-4.5L16.862 4.487z"
+                          />
+                        </svg>
+                        Perbarui Buku
+                      </button>
 
+                      <button
+                        type="button"
+                        onClick={() => setShowArchiveModal(true)}
+                        disabled={archiving}
+                        className="inline-flex h-10 items-center gap-2 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4h6v3m-9 0h12"
+                          />
+                        </svg>
+                        {archiving ? "Menghapus..." : "Hapus"}
+                      </button>
+                    </div>
+                  )}
                       <button
                         type="button"
                         onClick={() => setShowArchiveModal(true)}

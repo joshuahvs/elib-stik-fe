@@ -93,9 +93,12 @@ export default async function AnnouncementsPage() {
 
           {/* TITLE */}
           <h1 className="text-4xl font-bold mb-3">Pengumuman</h1>
+          <h1 className="text-4xl font-bold mb-3">Pengumuman</h1>
 
           {/* SUBTITLE */}
           <p className="text-white/80 max-w-xl">
+            Informasi terbaru terkait kegiatan, pembaruan layanan, dan
+            pengumuman resmi perpustakaan.
             Informasi terbaru terkait kegiatan, pembaruan layanan, dan
             pengumuman resmi perpustakaan.
           </p>
@@ -105,6 +108,7 @@ export default async function AnnouncementsPage() {
       {/* LIST */}
       <div className="max-w-6xl mx-auto">
         {announcements.length === 0 ? (
+          <div className="text-center text-gray-500">Tidak ada pengumuman</div>
           <div className="text-center text-gray-500">Tidak ada pengumuman</div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -139,12 +143,29 @@ export default async function AnnouncementsPage() {
                           {dateLabel}
                         </span>
                       </div>
+                        <span className="text-xs text-gray-400">
+                          {dateLabel}
+                        </span>
+                      </div>
 
                       {/* TITLE */}
                       <h2 className="text-lg font-semibold text-[#1F2937] mb-2 line-clamp-2">
                         {item.title}
                       </h2>
+                      {/* TITLE */}
+                      <h2 className="text-lg font-semibold text-[#1F2937] mb-2 line-clamp-2">
+                        {item.title}
+                      </h2>
 
+                      {/* CONTENT */}
+                      <p className="text-sm text-gray-500 line-clamp-2">
+                        {item.content || "-"}
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
                       {/* CONTENT */}
                       <p className="text-sm text-gray-500 line-clamp-2">
                         {item.content || "-"}
