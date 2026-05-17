@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { fetchBukuById, type BukuRow } from "@/app/lib/koleksi";
 import { API_URL } from "@/app/lib/api";
-import { fetchDigitalSignedUrl } from "@/app/lib/booksDigital";
+import { fetchDigitalSignedUrl, openInNewTab } from "@/app/lib/booksDigital";
 import { ajukanPeminjamanBuku } from "@/app/lib/peminjamanBuku";
 import ErrorMessage, { getErrorMessage } from "@/app/components/ErrorMessage";
 import { fetchMe } from "@/app/lib/me";
@@ -125,7 +125,13 @@ export default function KoleksiDetailPage() {
   const [digitalPreviewUrl, setDigitalPreviewUrl] = useState<string | null>(
     null,
   );
+  const [digitalPreviewBlobUrl, setDigitalPreviewBlobUrl] = useState<
+    string | null
+  >(null);
   const [digitalPreviewLoading, setDigitalPreviewLoading] = useState(false);
+  const [digitalPreviewError, setDigitalPreviewError] = useState<string | null>(
+    null,
+  );
 
   // Loan
   const [submittingLoan, setSubmittingLoan] = useState(false);
@@ -225,6 +231,14 @@ export default function KoleksiDetailPage() {
     loadReviews();
   }, [params.id]);
 
+  useEffect(() => {
+    return () => {
+      if (digitalPreviewBlobUrl) {
+        URL.revokeObjectURL(digitalPreviewBlobUrl);
+      }
+    };
+  }, [digitalPreviewBlobUrl]);
+
   // PBI-32 — load reviews
   const loadReviews = async () => {
     if (!params.id) return;
@@ -272,9 +286,9 @@ export default function KoleksiDetailPage() {
   }, [book?.file_path, book?.filePath, digitalMeta?.file_path]);
 
   const digitalPreviewSrc = useMemo(() => {
-    if (!digitalPreviewUrl) return null;
-    return `${digitalPreviewUrl}#toolbar=0&navpanes=0&scrollbar=0`;
-  }, [digitalPreviewUrl]);
+    if (!digitalPreviewBlobUrl) return null;
+    return `${digitalPreviewBlobUrl}#toolbar=0&navpanes=0&scrollbar=0`;
+  }, [digitalPreviewBlobUrl]);
 
   const akhirPinjam = useMemo(() => {
     if (!tanggalPinjam) return "";
@@ -319,12 +333,42 @@ export default function KoleksiDetailPage() {
       setDigitalPreviewLoading(true);
       setDigitalPreviewOpen(true);
       setDigitalPreviewUrl(null);
+      setDigitalPreviewBlobUrl(null);
+      setDigitalPreviewError(null);
       setPageError(null);
       const { signedUrl } = await fetchDigitalSignedUrl({
         token: t,
         bookId: digitalId,
       });
       setDigitalPreviewUrl(signedUrl);
+
+      try {
+        const res = await fetch(signedUrl, { method: "GET" });
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          throw new Error(text || `Gagal memuat file digital (${res.status})`);
+        }
+        const contentType = res.headers.get("content-type") ?? "";
+        const buffer = await res.arrayBuffer();
+        if (!buffer || buffer.byteLength === 0) {
+          throw new Error("File digital kosong atau tidak dapat dibaca");
+        }
+        const blob = new Blob([buffer], { type: "application/pdf" });
+        const blobUrl = URL.createObjectURL(blob);
+        setDigitalPreviewBlobUrl(blobUrl);
+        if (!contentType.toLowerCase().includes("pdf")) {
+          setDigitalPreviewError(
+            "File digital tidak terdeteksi sebagai PDF. Jika preview kosong, buka di tab baru.",
+          );
+        }
+      } catch (e) {
+        setDigitalPreviewError(
+          getErrorMessage(
+            e,
+            "Preview tidak dapat dimuat di halaman ini. Silakan buka di tab baru.",
+          ),
+        );
+      }
     } catch (e) {
       closeDigitalPreview();
       setPageError(getErrorMessage(e, "Buku Digital Belum Tersedia"));
@@ -337,7 +381,9 @@ export default function KoleksiDetailPage() {
   function closeDigitalPreview() {
     setDigitalPreviewOpen(false);
     setDigitalPreviewUrl(null);
+    setDigitalPreviewBlobUrl(null);
     setDigitalPreviewLoading(false);
+    setDigitalPreviewError(null);
   }
 
   function openLoanModal() {
@@ -1258,14 +1304,31 @@ export default function KoleksiDetailPage() {
                 <h3 className="text-base font-semibold text-slate-900">
                   Preview Buku Digital (Read Only)
                 </h3>
-                <button
-                  type="button"
-                  onClick={closeDigitalPreview}
-                  className="text-slate-400 hover:text-slate-600"
-                >
-                  X
-                </button>
+                <div className="flex items-center gap-2">
+                  {digitalPreviewUrl ? (
+                    <button
+                      type="button"
+                      onClick={() => openInNewTab(digitalPreviewUrl)}
+                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-slate-300 hover:text-slate-800"
+                    >
+                      Buka di tab baru
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={closeDigitalPreview}
+                    className="text-slate-400 hover:text-slate-600"
+                  >
+                    X
+                  </button>
+                </div>
               </div>
+
+              {digitalPreviewError ? (
+                <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  {digitalPreviewError}
+                </div>
+              ) : null}
 
               {digitalPreviewLoading ? (
                 <div className="flex h-[70vh] items-center justify-center text-sm text-slate-500">
@@ -1276,8 +1339,18 @@ export default function KoleksiDetailPage() {
                   src={digitalPreviewSrc}
                   title="Preview Buku Digital"
                   className="h-[70vh] w-full rounded-xl border border-slate-200"
-                  sandbox="allow-same-origin allow-scripts"
                 />
+              ) : digitalPreviewUrl ? (
+                <div className="flex h-[70vh] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-300 text-center text-sm text-slate-500">
+                  <p>Preview tidak dapat ditampilkan di halaman ini.</p>
+                  <button
+                    type="button"
+                    onClick={() => openInNewTab(digitalPreviewUrl)}
+                    className="inline-flex items-center justify-center rounded-lg bg-[#6b3a22] px-4 py-2 text-sm font-semibold text-white hover:opacity-95"
+                  >
+                    Buka di tab baru
+                  </button>
+                </div>
               ) : (
                 <div className="flex h-[70vh] items-center justify-center rounded-xl border border-dashed border-slate-300 text-sm text-slate-500">
                   Preview belum tersedia.
