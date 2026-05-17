@@ -398,3 +398,188 @@ export async function ajukanPerpanjanganPeminjaman(opts: {
 
   throw lastError ?? new Error("Gagal mengajukan perpanjangan");
 }
+
+export type DailyCirculationStats = {
+  date: string;
+  statistics: {
+    peminjaman_hari_ini: number;
+    pengembalian_hari_ini: number;
+    keterlambatan_hari_ini: number;
+  };
+};
+
+export type DailyCirculationDetail = {
+  data: any[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+export async function fetchDailyCirculationDashboard(opts: {
+  token: string;
+}): Promise<DailyCirculationStats> {
+  const url = `${API_URL}/peminjaman-buku/admin/dashboard`;
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${opts.token}`,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+
+  const { data, textBody } = await parseJsonOrText(res);
+  if (!res.ok) {
+    const msg = pickErrorMessage(data, textBody, "Gagal mengambil data dashboard");
+    throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+  }
+
+  return data as DailyCirculationStats;
+}
+
+export async function fetchDailyCirculationDetail(opts: {
+  token: string;
+  page?: number;
+  limit?: number;
+}): Promise<DailyCirculationDetail> {
+  const page = Math.max(1, Math.trunc(opts.page ?? 1));
+  const limit = Math.min(100, Math.max(1, Math.trunc(opts.limit ?? 10)));
+
+  const url = new URL(`${API_URL}/peminjaman-buku/admin/dashboard/detail`);
+  url.searchParams.set("page", String(page));
+  url.searchParams.set("limit", String(limit));
+
+  const res = await fetch(url.toString(), {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${opts.token}`,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+
+  const { data, textBody } = await parseJsonOrText(res);
+  if (!res.ok) {
+    const msg = pickErrorMessage(data, textBody, "Gagal mengambil data detail");
+    throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+  }
+
+  const items = pickArray(data);
+  const meta = (data as any)?.meta ?? (data as any)?.pagination ?? {};
+  const total = pickNumber(
+    data,
+    ["total", "totalItems", "count"],
+    pickNumber(meta, ["total", "totalItems", "count"], items.length)
+  );
+  const outPage = pickNumber(data, ["page"], pickNumber(meta, ["page"], page));
+  const outLimit = pickNumber(
+    data,
+    ["limit", "take", "pageSize"],
+    pickNumber(meta, ["limit", "take", "pageSize"], limit)
+  );
+  const totalPages = pickNumber(
+    data,
+    ["totalPages", "pages"],
+    pickNumber(meta, ["totalPages", "pages"], 1)
+  );
+
+  return {
+    data: items,
+    meta: {
+      page: Math.max(1, Math.trunc(outPage || page)),
+      limit: Math.max(1, Math.trunc(outLimit || limit)),
+      total: Math.max(0, Math.trunc(total || 0)),
+      totalPages: Math.max(1, Math.trunc(totalPages || 1)),
+    },
+  };
+}
+
+export type LoanTrendData = {
+  data: Array<{
+    date: string;
+    count: number;
+  }>;
+  meta: {
+    startDate: string;
+    endDate: string;
+    total: number;
+    averagePerDay: string;
+  };
+};
+
+export type PopularBook = {
+  no: number;
+  buku_id: number;
+  judul: string;
+  nama_orang: string;
+  subjek: string | null;
+  jumlah_peminjaman: number;
+};
+
+export type PopularBooksData = {
+  data: PopularBook[];
+  categories: string[];
+  meta: {
+    total: number;
+    limit: number;
+    category: string | null;
+  };
+};
+
+export async function fetchLoanTrend(opts: {
+  token: string;
+  startDate?: string;
+  endDate?: string;
+}): Promise<LoanTrendData> {
+  const url = new URL(`${API_URL}/admin/landing/content/loan-trend`);
+  if (opts.startDate) url.searchParams.set("startDate", opts.startDate);
+  if (opts.endDate) url.searchParams.set("endDate", opts.endDate);
+
+  const res = await fetch(url.toString(), {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${opts.token}`,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+
+  const { data, textBody } = await parseJsonOrText(res);
+  if (!res.ok) {
+    const msg = pickErrorMessage(data, textBody, "Gagal mengambil data tren peminjaman");
+    throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+  }
+
+  return data as LoanTrendData;
+}
+
+export async function fetchPopularBooks(opts: {
+  token: string;
+  category?: string;
+  limit?: number;
+}): Promise<PopularBooksData> {
+  const url = new URL(`${API_URL}/admin/landing/content/popular-books`);
+  if (opts.category) url.searchParams.set("category", opts.category);
+  if (opts.limit) url.searchParams.set("limit", String(opts.limit));
+
+  const res = await fetch(url.toString(), {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${opts.token}`,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+
+  const { data, textBody } = await parseJsonOrText(res);
+  if (!res.ok) {
+    const msg = pickErrorMessage(data, textBody, "Gagal mengambil data buku populer");
+    throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+  }
+
+  return data as PopularBooksData;
+}
