@@ -177,13 +177,19 @@ export default function AdminSkripsiDetailPage() {
 
   useEffect(() => {
     if (!id || !token || !isAdmin || meLoading) return;
+    const authToken = token;
+    const skripsiId = Array.isArray(id) ? id[0] : id;
+    if (!skripsiId) return;
     let cancelled = false;
 
     async function loadDetail() {
       setIsLoading(true);
       setError(null);
       try {
-        const data = await fetchSkripsiAdminDetail({ token, id });
+        const data = await fetchSkripsiAdminDetail({
+          token: authToken,
+          id: skripsiId,
+        });
         if (!cancelled) setRow(data);
       } catch (e) {
         if (!cancelled) setError(getErrorMessage(e, "Gagal memuat detail"));
