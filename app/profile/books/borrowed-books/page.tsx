@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, Calendar, Minus, Plus, X } from "lucide-react";
-import { fetchDigitalSignedUrl, openInNewTab } from "@/app/lib/booksDigital";
+import { fetchDigitalSignedUrl } from "@/app/lib/booksDigital";
 import {
   ajukanPerpanjanganPeminjaman,
   fetchRiwayatPeminjamanMe,
@@ -510,6 +510,14 @@ export default function BorrowedBooksPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const [openingDigitalId, setOpeningDigitalId] = useState<string | null>(null);
+  const [digitalPreviewOpen, setDigitalPreviewOpen] = useState(false);
+  const [digitalPreviewUrl, setDigitalPreviewUrl] = useState<string | null>(
+    null,
+  );
+  const [digitalPreviewTitle, setDigitalPreviewTitle] = useState<string | null>(
+    null,
+  );
+  const [digitalPreviewLoading, setDigitalPreviewLoading] = useState(false);
 
   const [perpanjanganOpen, setPerpanjanganOpen] = useState(false);
   const [perpanjanganLoan, setPerpanjanganLoan] = useState<BorrowedBook | null>(
@@ -540,6 +548,13 @@ export default function BorrowedBooksPage() {
     setKonfirmasiPerpanjanganOpen(false);
     setPerpanjanganLoan(null);
     setPerpanjanganError(null);
+  }
+
+  function closeDigitalPreview() {
+    setDigitalPreviewOpen(false);
+    setDigitalPreviewUrl(null);
+    setDigitalPreviewTitle(null);
+    setDigitalPreviewLoading(false);
   }
 
   function handleFilterStatusChange(status: string | null) {
@@ -596,7 +611,7 @@ export default function BorrowedBooksPage() {
     }
   }
 
-  async function handleOpenDigital(digitalId: string) {
+  async function handleOpenDigital(digitalId: string, title?: string) {
     const token = window.localStorage.getItem("token");
     if (!token) {
       window.location.href = "/auth/login";
@@ -606,15 +621,21 @@ export default function BorrowedBooksPage() {
     try {
       setOpeningDigitalId(digitalId);
       setActionError(null);
+      setDigitalPreviewTitle(title ?? "Buku Digital");
+      setDigitalPreviewOpen(true);
+      setDigitalPreviewLoading(true);
+      setDigitalPreviewUrl(null);
       const { signedUrl } = await fetchDigitalSignedUrl({
         token,
         bookId: digitalId,
       });
-      openInNewTab(signedUrl);
+      setDigitalPreviewUrl(signedUrl);
     } catch (e) {
+      closeDigitalPreview();
       setActionError(getErrorMessage(e, "Gagal membuka buku digital"));
     } finally {
       setOpeningDigitalId(null);
+      setDigitalPreviewLoading(false);
     }
   }
 
@@ -649,6 +670,11 @@ export default function BorrowedBooksPage() {
   }, [page, totalPages]);
 
   const now = useMemo(() => new Date(), []);
+
+  const digitalPreviewSrc = useMemo(() => {
+    if (!digitalPreviewUrl) return null;
+    return `${digitalPreviewUrl}#toolbar=0&navpanes=0&scrollbar=0`;
+  }, [digitalPreviewUrl]);
 
   useEffect(() => {
     setToken(window.localStorage.getItem("token"));
@@ -1014,7 +1040,7 @@ export default function BorrowedBooksPage() {
                               <button
                                 type="button"
                                 onClick={() =>
-                                  handleOpenDigital(item.digitalId!)
+                                  handleOpenDigital(item.digitalId!, item.judul)
                                 }
                                 disabled={openingDigitalId === item.digitalId}
                                 className={
@@ -1148,6 +1174,56 @@ export default function BorrowedBooksPage() {
           onClose={() => setKonfirmasiPerpanjanganOpen(false)}
           onConfirm={submitPerpanjanganConfirmed}
         />
+
+        {digitalPreviewOpen ? (
+          <div
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 px-4"
+            role="dialog"
+            aria-modal="true"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) closeDigitalPreview();
+            }}
+          >
+            <div className="w-full max-w-5xl rounded-2xl bg-white p-5 shadow-xl">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-semibold text-slate-900">
+                    Preview Buku Digital (Read Only)
+                  </h3>
+                  {digitalPreviewTitle ? (
+                    <p className="mt-1 text-xs text-slate-500">
+                      {digitalPreviewTitle}
+                    </p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={closeDigitalPreview}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {digitalPreviewLoading ? (
+                <div className="flex h-[70vh] items-center justify-center text-sm text-slate-500">
+                  Memuat preview...
+                </div>
+              ) : digitalPreviewSrc ? (
+                <iframe
+                  src={digitalPreviewSrc}
+                  title="Preview Buku Digital"
+                  className="h-[70vh] w-full rounded-xl border border-slate-200"
+                  sandbox="allow-same-origin allow-scripts"
+                />
+              ) : (
+                <div className="flex h-[70vh] items-center justify-center rounded-xl border border-dashed border-slate-300 text-sm text-slate-500">
+                  Preview belum tersedia.
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
       </main>
     </div>
   );

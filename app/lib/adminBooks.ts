@@ -65,3 +65,169 @@ export async function createAdminBook(opts: {
 
   return data;
 }
+
+export async function updateAdminBook(opts: {
+  token: string;
+  id: string | number;
+  judul: string;
+  nama_orang: string;
+  penerbit: string;
+  tahun_terbit: string;
+  subjek: string;
+  lokasi: string;
+  sinopsis: string;
+  jumlah_eksemplar: string;
+  url_sampul?: string | null;
+  isbn?: string;
+  bahasa?: string;
+}) {
+  const res = await fetch(`${API_URL}/admin/books/${encodeURIComponent(String(opts.id))}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${opts.token}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({
+      judul: opts.judul,
+      nama_orang: opts.nama_orang,
+      penerbit: opts.penerbit,
+      tahun_terbit: opts.tahun_terbit,
+      subjek: opts.subjek,
+      lokasi: opts.lokasi,
+      sinopsis: opts.sinopsis,
+      jumlah_eksemplar: opts.jumlah_eksemplar,
+      url_sampul: opts.url_sampul ?? null,
+      isbn: opts.isbn,
+      bahasa: opts.bahasa,
+    }),
+  });
+
+  const data = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    const msg =
+      pickFirstString(data, ["message", "error", "detail"]) ??
+      "Gagal memperbarui buku";
+    throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+  }
+
+  return data;
+}
+
+export async function archiveAdminBook(opts: {
+  token: string;
+  id: string | number;
+}) {
+  const res = await fetch(
+    `${API_URL}/admin/books/${encodeURIComponent(String(opts.id))}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${opts.token}`,
+        Accept: "application/json",
+      },
+    },
+  );
+
+  const data = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    const msg =
+      pickFirstString(data, ["message", "error", "detail"]) ??
+      "Gagal menghapus buku";
+
+    throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+  }
+
+  return data;
+}
+
+export type ArchivedBookRow = {
+  id: number | string;
+  judul: string | null;
+  nama_orang: string | null;
+  subjek: string | null;
+  tahun_terbit: number | null;
+  archived_at: string | null;
+  url_sampul?: string | null;
+  penerbit?: string | null;
+  lokasi?: string | null;
+  jumlah_eksemplar?: number | null;
+};
+
+export type ArchivedBooksResponse = {
+  data: ArchivedBookRow[];
+  categories?: string[];
+  meta: {
+    total_data: number;
+    current_page: number;
+    total_pages: number;
+    per_page: number;
+  };
+};
+
+export async function fetchArchivedBooks(opts: {
+  token: string;
+  page?: number;
+  limit?: number;
+  q?: string;
+  category?: string;
+  from?: string;
+  to?: string;
+}): Promise<ArchivedBooksResponse> {
+  const qs = new URLSearchParams();
+
+  if (opts.page) qs.set("page", String(opts.page));
+  if (opts.limit) qs.set("limit", String(opts.limit));
+  if (opts.q?.trim()) qs.set("q", opts.q.trim());
+  if (opts.category?.trim()) qs.set("category", opts.category.trim());
+  if (opts.from?.trim()) qs.set("from", opts.from.trim());
+  if (opts.to?.trim()) qs.set("to", opts.to.trim());
+
+  const res = await fetch(`${API_URL}/admin/books/archive?${qs.toString()}`, {
+    headers: {
+      Authorization: `Bearer ${opts.token}`,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+
+  const data = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    const msg =
+      pickFirstString(data, ["message", "error", "detail"]) ??
+      "Gagal mengambil data arsip buku";
+    throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+  }
+
+  return data;
+}
+
+export async function retrieveArchivedBook(opts: {
+  token: string;
+  id: string | number;
+}) {
+  const res = await fetch(
+    `${API_URL}/admin/books/${encodeURIComponent(String(opts.id))}/retrieve`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${opts.token}`,
+        Accept: "application/json",
+      },
+    },
+  );
+
+  const data = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    const msg =
+      pickFirstString(data, ["message", "error", "detail"]) ??
+      "Gagal mengembalikan buku";
+    throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+  }
+
+  return data;
+}

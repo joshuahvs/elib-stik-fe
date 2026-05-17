@@ -6,7 +6,18 @@ import "swiper/css";
 import "swiper/css/navigation";
 import { Navigation } from "swiper/modules";
 
-export default function ArticlesSlider({ articles }: any) {
+type InsightItem = {
+  id: string;
+  title: string;
+  imageUrl?: string | null;
+  meta?: string | null;
+  href: string;
+  label?: string | null;
+};
+
+export default function ArticlesSlider({ items }: { items: InsightItem[] }) {
+  const safeItems = Array.isArray(items) ? items : [];
+
   return (
     <Swiper
       modules={[Navigation]}
@@ -19,24 +30,43 @@ export default function ArticlesSlider({ articles }: any) {
         1024: { slidesPerView: 3 },
       }}
     >
-      {articles.map((item: any) => (
+      {safeItems.map((item) => (
         <SwiperSlide key={item.id}>
           <Link
-            href={`/articles/${item.id}`}
-            className="group block bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-200"
+            href={item.href}
+            className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-white/60 bg-white/90 shadow-[0_18px_50px_-35px_rgba(15,7,2,0.6)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_35px_80px_-45px_rgba(15,7,2,0.7)]"
           >
-            <img
-              src={item.url_sampul}
-              className="h-48 w-full object-cover group-hover:scale-105 transition-transform duration-300"
-              alt={item.judul}
-            />
-            <div className="p-6">
-              <h3 className="font-semibold text-lg mb-2 group-hover:text-[#512F16] transition">
-                {item.judul}
+            <div className="relative h-56 w-full overflow-hidden">
+              {item.imageUrl ? (
+                <img
+                  src={item.imageUrl}
+                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  alt={item.title}
+                />
+              ) : (
+                <div className="h-full w-full bg-gradient-to-br from-slate-200 via-slate-100 to-white" />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+              <div className="absolute left-4 right-4 bottom-4 flex flex-wrap items-center gap-2 text-xs">
+                {item.label ? (
+                  <span className="rounded-full bg-white/90 px-3 py-1 font-semibold text-[#2A170C]">
+                    {item.label}
+                  </span>
+                ) : null}
+                {item.meta ? (
+                  <span className="rounded-full bg-black/40 px-3 py-1 text-white/80">
+                    {item.meta}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+            <div className="flex flex-1 flex-col p-6">
+              <h3 className="text-lg font-semibold text-slate-900 group-hover:text-[#6b3a22] transition line-clamp-2">
+                {item.title}
               </h3>
-              <p className="text-xs text-gray-400">
-                {item.tahun_terbit}
-              </p>
+              <div className="mt-4 text-xs text-slate-400">
+                Baca selengkapnya
+              </div>
             </div>
           </Link>
         </SwiperSlide>

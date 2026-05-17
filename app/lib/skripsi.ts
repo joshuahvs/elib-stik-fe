@@ -13,6 +13,22 @@ export function isSkripsiCancelledStatus(status: unknown): boolean {
   return s === "DIBATALKAN" || s === "CANCELLED" || s === "CANCELED";
 }
 
+export function isSkripsiResubmittableStatus(status: unknown): boolean {
+  const s = normalizeSkripsiStatus(status);
+  return (
+    s === "DITOLAK" ||
+    s === "DIBATALKAN" ||
+    s === "CANCELLED" ||
+    s === "CANCELED"
+  );
+}
+
+export type SkripsiUser = {
+  nama_lengkap?: string | null;
+  nim?: string | null;
+  username?: string | null;
+};
+
 export type SkripsiRow = {
   id: string;
   user_id?: string;
@@ -31,6 +47,8 @@ export type SkripsiRow = {
   updated_at?: string;
   cancelled_at?: string | null;
   reviewed_at?: string | null;
+  users?: SkripsiUser | null;
+  user?: SkripsiUser | null;
 };
 
 export type SkripsiUploadEligibility = {
@@ -42,7 +60,7 @@ export function getSkripsiUploadEligibility(
   items: SkripsiRow[],
 ): SkripsiUploadEligibility {
   for (const row of items ?? []) {
-    if (!isSkripsiCancelledStatus(row?.status)) {
+    if (!isSkripsiResubmittableStatus(row?.status)) {
       const blockingStatus = normalizeSkripsiStatus(row?.status) || "UNKNOWN";
       return { allowed: false, blockingStatus };
     }
@@ -76,6 +94,36 @@ function pickNumber(data: any, keys: string[], fallback: number): number {
   return fallback;
 }
 
+function buildListResult<T>(data: any, page: number, limit: number): ListSkripsiMeResult<T> {
+  const items = pickArray(data);
+  const meta = (data as any)?.meta ?? (data as any)?.pagination ?? {};
+
+  const total = pickNumber(
+    data,
+    ["total", "totalItems", "count"],
+    pickNumber(meta, ["total", "totalItems", "count"], items.length),
+  );
+  const totalPages = pickNumber(
+    meta,
+    ["totalPages", "total_pages"],
+    Math.max(Math.ceil((total || 0) / limit), 1),
+  );
+  const outPage = pickNumber(data, ["page"], pickNumber(meta, ["page"], page));
+  const outLimit = pickNumber(
+    data,
+    ["limit", "take", "pageSize"],
+    pickNumber(meta, ["limit", "take", "pageSize"], limit),
+  );
+
+  return {
+    items: (items ?? []) as T[],
+    page: Math.max(1, Math.trunc(outPage || page)),
+    limit: Math.max(1, Math.trunc(outLimit || limit)),
+    total: Math.max(0, Math.trunc(total || 0)),
+    totalPages: Math.max(1, Math.trunc(totalPages || 1)),
+  };
+}
+
 async function parseJsonOrText(res: Response) {
   const contentType = res.headers.get("content-type") ?? "";
   const isJson = contentType.includes("application/json");
@@ -97,8 +145,8 @@ export async function uploadSkripsi(opts: {
   judul: string;
   tahun: string;
   abstrak: string;
-  pembimbing: string;
-  penguji: string;
+  pembimbing?: string;
+  penguji?: string;
   penulis_tambahan?: Array<{ nim: string; nama: string }>;
   file: File;
   file_ttd: File;
@@ -114,8 +162,12 @@ export async function uploadSkripsi(opts: {
   formData.append("judul", opts.judul);
   formData.append("tahun", opts.tahun);
   formData.append("abstrak", opts.abstrak);
-  formData.append("pembimbing", opts.pembimbing.trim());
-  formData.append("penguji", opts.penguji.trim());
+  if (opts.pembimbing?.trim()) {
+    formData.append("pembimbing", opts.pembimbing.trim());
+  }
+  if (opts.penguji?.trim()) {
+    formData.append("penguji", opts.penguji.trim());
+  }
   for (const penulis of opts.penulis_tambahan ?? []) {
     const nim = String(penulis?.nim ?? "").trim();
     const nama = String(penulis?.nama ?? "").trim();
@@ -172,33 +224,7 @@ export async function fetchSkripsiMe(opts: {
     throw new Error(`${res.status} ${res.statusText}: ${msg}`);
   }
 
-  const items = pickArray(data);
-  const meta = (data as any)?.meta ?? (data as any)?.pagination ?? {};
-
-  const total = pickNumber(
-    data,
-    ["total", "totalItems", "count"],
-    pickNumber(meta, ["total", "totalItems", "count"], items.length),
-  );
-  const totalPages = pickNumber(
-    meta,
-    ["totalPages", "total_pages"],
-    Math.max(Math.ceil((total || 0) / limit), 1),
-  );
-  const outPage = pickNumber(data, ["page"], pickNumber(meta, ["page"], page));
-  const outLimit = pickNumber(
-    data,
-    ["limit", "take", "pageSize"],
-    pickNumber(meta, ["limit", "take", "pageSize"], limit),
-  );
-
-  return {
-    items: (items ?? []) as SkripsiRow[],
-    page: Math.max(1, Math.trunc(outPage || page)),
-    limit: Math.max(1, Math.trunc(outLimit || limit)),
-    total: Math.max(0, Math.trunc(total || 0)),
-    totalPages: Math.max(1, Math.trunc(totalPages || 1)),
-  };
+  return buildListResult<SkripsiRow>(data, page, limit);
 }
 
 export async function cancelSkripsi(opts: {
@@ -297,6 +323,192 @@ export async function fetchSkripsiTtdSignedUrl(opts: {
   const { data, textBody } = await parseJsonOrText(res);
   if (!res.ok) {
     const msg = pickErrorMessage(data, textBody, "Gagal mengambil link TTD");
+    throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+  }
+
+  const signedUrl =
+    pickFirstString(data, ["signedUrl", "signed_url", "url"]) ?? "";
+
+  if (!signedUrl) {
+    throw new Error("Response tidak memiliki signedUrl");
+  }
+
+  return {
+    signedUrl,
+    expiresIn: (data as any)?.expiresIn,
+    bucket: (data as any)?.bucket,
+    path: (data as any)?.path,
+  };
+}
+
+export async function fetchSkripsiAdminList(opts: {
+  token: string;
+  page?: number;
+  limit?: number;
+  status?: string;
+  q?: string;
+}): Promise<ListSkripsiMeResult<SkripsiRow>> {
+  const page = Math.max(1, Math.trunc(opts.page ?? 1));
+  const limit = Math.min(100, Math.max(1, Math.trunc(opts.limit ?? 10)));
+
+  const url = new URL(`${API_URL}/skripsi/admin`);
+  url.searchParams.set("page", String(page));
+  url.searchParams.set("limit", String(limit));
+  if (opts.status) url.searchParams.set("status", opts.status);
+  if (opts.q) url.searchParams.set("q", opts.q);
+
+  const res = await fetch(url.toString(), {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${opts.token}`,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+
+  const { data, textBody } = await parseJsonOrText(res);
+  if (!res.ok) {
+    const msg = pickErrorMessage(data, textBody, "Gagal mengambil daftar skripsi");
+    throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+  }
+
+  return buildListResult<SkripsiRow>(data, page, limit);
+}
+
+export async function fetchSkripsiAdminDetail(opts: {
+  token: string;
+  id: string;
+}): Promise<SkripsiRow> {
+  const res = await fetch(
+    `${API_URL}/skripsi/admin/${encodeURIComponent(opts.id)}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${opts.token}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    },
+  );
+
+  const { data, textBody } = await parseJsonOrText(res);
+  if (!res.ok) {
+    const msg = pickErrorMessage(data, textBody, "Gagal mengambil detail skripsi");
+    throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+  }
+
+  return ((data as any)?.data ?? data) as SkripsiRow;
+}
+
+export async function updateSkripsiStatus(opts: {
+  token: string;
+  id: string;
+  status: "DISETUJUI" | "DITOLAK" | string;
+  alasan_ditolak?: string;
+}): Promise<SkripsiRow> {
+  const res = await fetch(
+    `${API_URL}/skripsi/${encodeURIComponent(opts.id)}/status`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${opts.token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        status: opts.status,
+        alasan_ditolak: opts.alasan_ditolak,
+      }),
+    },
+  );
+
+  const { data, textBody } = await parseJsonOrText(res);
+  if (!res.ok) {
+    const msg = pickErrorMessage(data, textBody, "Gagal memperbarui status skripsi");
+    throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+  }
+
+  return ((data as any)?.data ?? data) as SkripsiRow;
+}
+
+export async function fetchSkripsiRepositoryList(opts: {
+  token: string;
+  page?: number;
+  limit?: number;
+  q?: string;
+  tahun?: string;
+}): Promise<ListSkripsiMeResult<SkripsiRow>> {
+  const page = Math.max(1, Math.trunc(opts.page ?? 1));
+  const limit = Math.min(100, Math.max(1, Math.trunc(opts.limit ?? 10)));
+
+  const url = new URL(`${API_URL}/skripsi/repository`);
+  url.searchParams.set("page", String(page));
+  url.searchParams.set("limit", String(limit));
+  if (opts.q) url.searchParams.set("q", opts.q);
+  if (opts.tahun) url.searchParams.set("tahun", opts.tahun);
+
+  const res = await fetch(url.toString(), {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${opts.token}`,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+
+  const { data, textBody } = await parseJsonOrText(res);
+  if (!res.ok) {
+    const msg = pickErrorMessage(data, textBody, "Gagal mengambil daftar skripsi");
+    throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+  }
+
+  return buildListResult<SkripsiRow>(data, page, limit);
+}
+
+export async function fetchSkripsiRepositoryDetail(opts: {
+  token: string;
+  id: string;
+}): Promise<SkripsiRow> {
+  const res = await fetch(
+    `${API_URL}/skripsi/repository/${encodeURIComponent(opts.id)}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${opts.token}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    },
+  );
+
+  const { data, textBody } = await parseJsonOrText(res);
+  if (!res.ok) {
+    const msg = pickErrorMessage(data, textBody, "Gagal mengambil detail skripsi");
+    throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+  }
+
+  return ((data as any)?.data ?? data) as SkripsiRow;
+}
+
+export async function fetchSkripsiRepositorySignedUrl(opts: {
+  token: string;
+  id: string;
+}): Promise<SkripsiSignedUrlResult> {
+  const res = await fetch(
+    `${API_URL}/skripsi/repository/${encodeURIComponent(opts.id)}/file`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${opts.token}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    },
+  );
+
+  const { data, textBody } = await parseJsonOrText(res);
+  if (!res.ok) {
+    const msg = pickErrorMessage(data, textBody, "Gagal mengambil link PDF");
     throw new Error(`${res.status} ${res.statusText}: ${msg}`);
   }
 
