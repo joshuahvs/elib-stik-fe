@@ -500,14 +500,18 @@ export default function AdminAnnouncementsPage() {
                                   <Pencil size={12} />
                                   Edit
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setDeleteTarget(announcement)}
-                                  className="inline-flex items-center gap-1 rounded-full bg-rose-600 px-3 py-1 text-xs font-semibold text-white hover:bg-rose-500"
-                                >
-                                  <Trash2 size={12} />
-                                  Hapus
-                                </button>
+                                {announcement.is_active !== false ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setDeleteTarget(announcement)
+                                    }
+                                    className="inline-flex items-center gap-1 rounded-full bg-rose-600 px-3 py-1 text-xs font-semibold text-white hover:bg-rose-500"
+                                  >
+                                    <Trash2 size={12} />
+                                    Hapus
+                                  </button>
+                                ) : null}
                               </div>
                             </td>
                           </tr>

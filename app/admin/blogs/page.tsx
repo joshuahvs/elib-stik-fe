@@ -119,6 +119,8 @@ export default function AdminBlogsPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<AdminBlog | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AdminBlog | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
@@ -301,22 +303,21 @@ export default function AdminBlogsPage() {
     }
   }
 
-  async function handleDelete(blog: AdminBlog) {
-    if (!token) return;
-
-    const ok = window.confirm(
-      `Hapus blog "${String(blog.title ?? "(Tanpa Judul)")}"?`,
-    );
-    if (!ok) return;
+  async function confirmDelete() {
+    if (!token || !deleteTarget) return;
 
     try {
+      setDeleteLoading(true);
       setError(null);
       setSuccess(null);
-      await deleteAdminBlog({ token, id: blog.id });
+      await deleteAdminBlog({ token, id: deleteTarget.id });
       setSuccess("Blog berhasil dihapus.");
+      setDeleteTarget(null);
       await loadBlogs();
     } catch (e: any) {
       setError(getErrorMessage(e, "Gagal menghapus blog"));
+    } finally {
+      setDeleteLoading(false);
     }
   }
 
@@ -502,13 +503,15 @@ export default function AdminBlogsPage() {
                                 >
                                   Edit
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDelete(blog)}
-                                  className="rounded-full bg-rose-600 px-3 py-1 text-xs font-semibold text-white hover:bg-rose-500"
-                                >
-                                  Hapus
-                                </button>
+                                {blog.status !== "draft" ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setDeleteTarget(blog)}
+                                    className="rounded-full bg-rose-600 px-3 py-1 text-xs font-semibold text-white hover:bg-rose-500"
+                                  >
+                                    Hapus
+                                  </button>
+                                ) : null}
                               </div>
                             </td>
                           </tr>
@@ -675,6 +678,38 @@ export default function AdminBlogsPage() {
                 </PrimaryButton>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteTarget ? (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
+            <div className="px-6 py-5 border-b">
+              <h3 className="text-lg font-semibold">Konfirmasi Hapus</h3>
+            </div>
+            <div className="px-6 py-5 text-sm text-slate-600">
+              Apakah Anda yakin ingin menghapus blog ini? Tindakan ini tidak
+              dapat dibatalkan.
+            </div>
+            <div className="px-6 py-4 flex items-center justify-end gap-3 border-t">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                disabled={deleteLoading}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-500 disabled:opacity-50"
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? "Menghapus..." : "Hapus"}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
