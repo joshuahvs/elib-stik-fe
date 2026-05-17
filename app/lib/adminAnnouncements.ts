@@ -1,6 +1,6 @@
 import { API_URL } from "@/app/lib/api";
 
-export type AnnouncementPriority = "low" | "medium" | "high" | "urgent" | string;
+export type AnnouncementPriority = "low" | "medium" | "high" | string;
 
 export type AdminAnnouncement = {
   id: string;

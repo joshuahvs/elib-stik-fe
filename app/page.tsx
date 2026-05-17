@@ -61,6 +61,42 @@ function formatAnnouncementDate(raw?: string | null) {
   }).format(date);
 }
 
+function normalizeAnnouncementPriority(value?: string | null) {
+  const s = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  if (s === "urgent") return "high";
+  if (s === "high" || s === "medium" || s === "low") return s;
+  return "unknown";
+}
+
+function getAnnouncementDateKey(raw?: string | null) {
+  if (!raw) return 0;
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return 0;
+  const key = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Asia/Jakarta",
+  }).format(parsed);
+  return Number(key.replace(/-/g, ""));
+}
+
+function getAnnouncementTimeValue(raw?: string | null) {
+  if (!raw) return 0;
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function getPriorityRank(value?: string | null) {
+  const p = normalizeAnnouncementPriority(value);
+  if (p === "high") return 3;
+  if (p === "medium") return 2;
+  if (p === "low") return 1;
+  return 0;
+}
+
 function normalizeInsights(blogs: any[]) {
   const blogItems = (blogs ?? []).map((item: any) => {
     const dateValue = item?.published_at ?? item?.created_at ?? null;
@@ -91,9 +127,23 @@ export default async function Home() {
   const [data, blogs, announcements] = await Promise.all([
     getLanding(),
     getBlogs(),
-    getAnnouncements(3),
+    getAnnouncements(),
   ]);
   const insights = normalizeInsights(blogs);
+  const sortedAnnouncements = [...announcements].sort((a: any, b: any) => {
+    const dateA = a?.published_at ?? a?.created_at ?? null;
+    const dateB = b?.published_at ?? b?.created_at ?? null;
+    const keyA = getAnnouncementDateKey(dateA);
+    const keyB = getAnnouncementDateKey(dateB);
+    if (keyB !== keyA) return keyB - keyA;
+
+    const prioA = getPriorityRank(a?.priority);
+    const prioB = getPriorityRank(b?.priority);
+    if (prioB !== prioA) return prioB - prioA;
+
+    return getAnnouncementTimeValue(dateB) - getAnnouncementTimeValue(dateA);
+  });
+  const visibleAnnouncements = sortedAnnouncements.slice(0, 3);
 
   return (
     <main className="bg-[#F5F5F5]">
@@ -200,10 +250,12 @@ export default async function Home() {
           </h2>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {announcements.map((item: any) => {
+            {visibleAnnouncements.map((item: any) => {
               const dateValue =
                 item?.published_at ?? item?.created_at ?? item?.date ?? null;
               const dateLabel = formatAnnouncementDate(dateValue);
+              const priority = normalizeAnnouncementPriority(item?.priority);
+              const isHighPriority = priority === "high";
 
               return (
                 <Link
@@ -211,8 +263,15 @@ export default async function Home() {
                   href={`/announcements/${item.id}`}
                   className="group bg-white border rounded-xl p-6 shadow-sm hover:shadow-xl transition"
                 >
-                  <div className="mb-3 text-xs text-[#D97706] font-semibold">
-                    ANNOUNCEMENT
+                  <div className="mb-3 flex items-center gap-2">
+                    <span className="text-xs text-[#D97706] font-semibold">
+                      ANNOUNCEMENT
+                    </span>
+                    {isHighPriority ? (
+                      <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
+                        High Priority
+                      </span>
+                    ) : null}
                   </div>
 
                   <h3 className="font-semibold text-lg mb-2 group-hover:text-[#512F16] transition">

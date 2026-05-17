@@ -66,7 +66,7 @@ function toDateInputValue(value?: string | null) {
 
 function priorityLabel(value?: string | null) {
   const s = (value ?? "").toLowerCase();
-  if (s === "urgent") return "Urgent";
+  if (s === "urgent") return "High";
   if (s === "high") return "High";
   if (s === "medium") return "Medium";
   if (s === "low") return "Low";
@@ -75,7 +75,8 @@ function priorityLabel(value?: string | null) {
 
 function normalizePriorityValue(value?: string | null): AnnouncementPriority {
   const s = (value ?? "").toLowerCase();
-  if (s === "urgent" || s === "high" || s === "medium" || s === "low") {
+  if (s === "urgent") return "high";
+  if (s === "high" || s === "medium" || s === "low") {
     return s;
   }
   return "medium";
@@ -83,7 +84,7 @@ function normalizePriorityValue(value?: string | null): AnnouncementPriority {
 
 function priorityBadge(value?: string | null) {
   const s = (value ?? "").toLowerCase();
-  if (s === "urgent") return "bg-rose-100 text-rose-600";
+  if (s === "urgent") return "bg-orange-100 text-orange-600";
   if (s === "high") return "bg-orange-100 text-orange-600";
   if (s === "medium") return "bg-blue-100 text-blue-600";
   if (s === "low") return "bg-slate-100 text-slate-600";
@@ -262,9 +263,6 @@ export default function AdminAnnouncementsPage() {
     if (!titleTrim) return setSubmitError("Judul pengumuman wajib diisi");
     if (!contentTrim) return setSubmitError("Konten pengumuman wajib diisi");
     if (!priority) return setSubmitError("Prioritas wajib dipilih");
-    if (!expiresAt.trim()) {
-      return setSubmitError("Tanggal kadaluarsa wajib diisi");
-    }
 
     try {
       setSubmitting(true);
@@ -322,7 +320,6 @@ export default function AdminAnnouncementsPage() {
 
   const priorityOptions = [
     { value: "high", label: "High" },
-    { value: "urgent", label: "Urgent" },
     { value: "medium", label: "Medium" },
     { value: "low", label: "Low" },
   ];
@@ -579,7 +576,7 @@ export default function AdminAnnouncementsPage() {
                 </div>
 
                 <InputField
-                  label="Tanggal Kadaluarsa *"
+                  label="Tanggal Kadaluarsa (opsional)"
                   type="date"
                   value={expiresAt}
                   onChange={(e) => setExpiresAt(e.target.value)}
