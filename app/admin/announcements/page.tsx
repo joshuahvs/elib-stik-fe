@@ -403,7 +403,7 @@ export default function AdminAnnouncementsPage() {
                 <table className="min-w-[980px] w-full text-sm">
                   <thead className="bg-slate-50 text-slate-500">
                     <tr>
-                      <th className="px-6 py-3 text-left font-semibold">ID</th>
+                      <th className="px-6 py-3 text-left font-semibold">No.</th>
                       <th className="px-6 py-3 text-left font-semibold">
                         Judul
                       </th>
@@ -458,7 +458,7 @@ export default function AdminAnnouncementsPage() {
                         return (
                           <tr key={announcement.id} className="text-slate-700">
                             <td className="px-6 py-4 text-sm font-semibold text-slate-800">
-                              {formatId(String(announcement.id), index)}
+                              {index + 1}
                             </td>
                             <td className="px-6 py-4">
                               <div className="font-semibold text-slate-900">
