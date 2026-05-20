@@ -243,8 +243,11 @@ export default async function Home() {
       </section>
 
       {/* ANNOUNCEMENTS */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-gradient-to-b from-white to-[#F8F4EF]">
         <div className="max-w-7xl mx-auto px-8">
+          <p className="mb-3 text-xs uppercase tracking-[0.3em] text-[#8A5A34]">
+            Campus Bulletin
+          </p>
           <h2 className="text-3xl font-bold mb-12 text-[#1F2937]">
             Latest Announcements
           </h2>
@@ -261,7 +264,7 @@ export default async function Home() {
                 <Link
                   key={item.id}
                   href={`/announcements/${item.id}`}
-                  className="group bg-white border rounded-xl p-6 shadow-sm hover:shadow-xl transition"
+                  className="group rounded-2xl border border-[#E8DCCF] bg-white/95 p-6 shadow-[0_14px_30px_-24px_rgba(33,16,8,0.5)] transition duration-300 hover:-translate-y-1 hover:border-[#C9A27D] hover:shadow-[0_24px_45px_-28px_rgba(33,16,8,0.55)]"
                 >
                   <div className="mb-3 flex items-center gap-2">
                     <span className="text-xs text-[#D97706] font-semibold">
@@ -274,15 +277,17 @@ export default async function Home() {
                     ) : null}
                   </div>
 
-                  <h3 className="font-semibold text-lg mb-2 group-hover:text-[#512F16] transition">
+                  <h3 className="mb-2 text-lg font-semibold leading-snug text-[#1F2937] transition-colors duration-300 group-hover:text-[#4A2A14]">
                     {item.title}
                   </h3>
 
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+                  <p className="mb-4 line-clamp-3 text-sm leading-relaxed text-[#4B5563]">
                     {item.content}
                   </p>
 
-                  <p className="text-xs text-gray-400">{dateLabel ?? "-"}</p>
+                  <p className="text-xs font-medium text-[#7C8796]">
+                    {dateLabel ?? "-"}
+                  </p>
                 </Link>
               );
             })}
