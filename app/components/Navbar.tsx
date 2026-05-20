@@ -59,6 +59,9 @@ export default function Navbar({ items }: NavbarProps) {
   const navItems: NavbarItem[] = items ?? [
     { label: "Beranda", href: "/" },
     { label: "Koleksi", href: "/koleksi" },
+    ...(isAuthed
+      ? [{ label: "Dashboard", href: "/dashboard-keaktifan" }]
+      : []),
     ...(canAccessRepository
       ? [{ label: "Repositori Skripsi", href: "/skripsi/repository" }]
       : []),
