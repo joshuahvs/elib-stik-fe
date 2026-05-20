@@ -1,7 +1,10 @@
-import { redirect } from "next/navigation";
+"use client";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+
 
 async function getSummary(month?: string, year?: string) {
   const query = new URLSearchParams();
@@ -74,8 +77,18 @@ export default async function DashboardKeaktifanPage({
     year?: string;
   };
 }) {
-  const month = searchParams.month;
-  const year = searchParams.year;
+  const router = useRouter();
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      router.push("/auth/login");
+    }
+  }, []);
+  const params = await searchParams
+  const month = params.month
+  const year = params.year
 
   const summary = await getSummary(month, year);
   const ranking = await getRanking(month, year);
@@ -134,6 +147,9 @@ export default async function DashboardKeaktifanPage({
               className="border rounded-lg px-4 py-2"
             >
               <option value="">Pilih Tahun</option>
+              <option value="2022">2022</option>
+              <option value="2023">2023</option>
+              <option value="2024">2024</option>
               <option value="2025">2025</option>
               <option value="2026">2026</option>
             </select>
@@ -148,107 +164,153 @@ export default async function DashboardKeaktifanPage({
         </div>
 
         {/* SUMMARY CARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-          <SummaryCard
-            title="Total Mahasiswa Aktif"
-            value={summary.totalMahasiswaAktif}
-          />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+          <div className="border rounded-xl p-4 bg-white shadow-sm">
+            <p className="text-sm text-gray-500">
+              Total Mahasiswa Aktif
+            </p>
 
-          <SummaryCard
-            title="Total Transaksi Peminjaman"
-            value={summary.totalTransaksi}
-          />
-
-          <SummaryCard
-            title="Rata-rata Peminjaman"
-            value={summary.rataRataPeminjaman}
-          />
-
-          <SummaryCard
-            title="Mahasiswa Paling Aktif"
-            value={summary.mahasiswaPalingAktif}
-          />
-        </div>
-
-        {/* TABLE + CHART */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* RANKING TABLE */}
-          <div className="bg-white rounded-xl shadow-sm p-6 border">
-            <h2 className="text-xl font-semibold mb-4">
-              Ranking Mahasiswa Paling Aktif
+            <h2 className="text-3xl font-bold text-[#8B4513] mt-2">
+              {summary?.totalActiveStudents || 0}
             </h2>
-
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3">Rank</th>
-                  <th className="text-left py-3">Nama Mahasiswa</th>
-                  <th className="text-left py-3">Jumlah Peminjaman</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {ranking.length > 0 ? (
-                  ranking.map((item: any, index: number) => (
-                    <tr key={index} className="border-b">
-                      <td className="py-3 font-semibold text-[#8B4513]">
-                        #{index + 1}
-                      </td>
-                      <td>{item.nama}</td>
-                      <td>{item.totalPeminjaman}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={3} className="py-4 text-gray-500">
-                      Tidak ada data ranking
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
           </div>
 
-          {/* CHART */}
-          <div className="bg-white rounded-xl shadow-sm p-6 border">
-            <h2 className="text-xl font-semibold mb-6">
-              Statistik Berdasarkan Jenjang
+          <div className="border rounded-xl p-4 bg-white shadow-sm">
+            <p className="text-sm text-gray-500">
+              Total Transaksi Peminjaman
+            </p>
+
+            <h2 className="text-3xl font-bold text-[#8B4513] mt-2">
+              {summary?.totalTransactions || 0}
             </h2>
+          </div>
 
-            {chart.length > 0 ? (
-              chart.map((item: any, index: number) => {
-                const widthPercent =
-                  maxChartValue > 0
-                    ? (item.total / maxChartValue) * 100
-                    : 0;
+          <div className="border rounded-xl p-4 bg-white shadow-sm">
+            <p className="text-sm text-gray-500">
+              Rata-rata Peminjaman
+            </p>
 
-                return (
-                  <div key={index} className="mb-6">
-                    <div className="flex justify-between mb-2">
-                      <span className="font-medium">{item.jenjang}</span>
-                      <span className="font-semibold">
-                        {item.total}
-                      </span>
-                    </div>
+            <h2 className="text-3xl font-bold text-[#8B4513] mt-2">
+              {summary?.averageBorrowings || 0}
+            </h2>
+          </div>
 
-                    <div className="w-full bg-gray-200 rounded-full h-4">
-                      <div
-                        className="bg-[#8B4513] h-4 rounded-full"
-                        style={{
-                          width: `${widthPercent}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <p className="text-gray-500">
-                Tidak ada data chart
-              </p>
-            )}
+          <div className="border rounded-xl p-4 bg-white shadow-sm">
+            <p className="text-sm text-gray-500">
+              Mahasiswa Paling Aktif
+            </p>
+
+            <h2 className="text-2xl font-bold text-[#8B4513] mt-2">
+              {summary?.mostActiveStudent || "-"}
+            </h2>
           </div>
         </div>
+
+
+<div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+
+  {/* RANKING */}
+  <div className="border rounded-2xl p-6 bg-white shadow-sm">
+    <h2 className="text-2xl font-bold mb-5">
+      Ranking Mahasiswa Paling Aktif
+    </h2>
+
+    <table className="w-full text-sm">
+      <thead>
+        <tr className="border-b">
+          <th className="text-left py-3">Rank</th>
+          <th className="text-left py-3">
+            Nama Mahasiswa
+          </th>
+          <th className="text-left py-3">
+            Jumlah Peminjaman
+          </th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {ranking.length > 0 ? (
+          ranking.map(
+            (
+              item: any,
+              index: number
+            ) => (
+              <tr
+                key={index}
+                className="border-b"
+              >
+                <td className="py-3 font-semibold text-[#8B4513]">
+                  #{index + 1}
+                </td>
+
+                <td>{item.nama}</td>
+
+                <td className="font-semibold">
+                  {item.jumlah}
+                </td>
+              </tr>
+            )
+          )
+        ) : (
+          <tr>
+            <td
+              colSpan={3}
+              className="text-center py-4 text-gray-500"
+            >
+              Tidak ada data ranking
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+
+  {/* CHART */}
+  <div className="border rounded-2xl p-6 bg-white shadow-sm">
+    <h2 className="text-2xl font-bold mb-5">
+      Statistik Berdasarkan Jenjang
+    </h2>
+
+    <div className="space-y-6">
+      {chart.length > 0 ? (
+        chart.map(
+          (
+            item: any,
+            index: number
+          ) => (
+            <div key={index}>
+              <div className="flex justify-between mb-2">
+                <span className="font-medium">
+                  {item.jenjang}
+                </span>
+
+                <span className="font-semibold">
+                  {item.total}
+                </span>
+              </div>
+
+              <div className="w-full bg-gray-200 rounded-full h-4">
+                <div
+                  className="bg-[#A0522D] h-4 rounded-full"
+                  style={{
+                    width: `${Math.min(
+                      item.total * 5,
+                      100
+                    )}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )
+        )
+      ) : (
+        <p className="text-gray-500">
+          Tidak ada data chart
+        </p>
+      )}
+    </div>
+  </div>
+</div>
 
         {/* FOOTNOTE */}
         <div className="bg-white rounded-xl shadow-sm p-5 mt-6 border">
