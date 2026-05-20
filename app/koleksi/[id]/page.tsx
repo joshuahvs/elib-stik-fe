@@ -9,6 +9,7 @@ import { ajukanPeminjamanBuku } from "@/app/lib/peminjamanBuku";
 import ErrorMessage, { getErrorMessage } from "@/app/components/ErrorMessage";
 import { fetchMe } from "@/app/lib/me";
 import { archiveAdminBook } from "@/app/lib/adminBooks";
+import PrimaryButton from "@/app/components/PrimaryButton";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -113,6 +114,7 @@ export default function KoleksiDetailPage() {
   const [error, setError] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [showArchiveSuccessModal, setShowArchiveSuccessModal] = useState(false);
   const todayYmd = useMemo(() => formatLocalYmd(new Date()), []);
 
   // Digital
@@ -545,8 +547,7 @@ export default function KoleksiDetailPage() {
       });
 
       setShowArchiveModal(false);
-      alert("Buku berhasil dipindahkan ke arsip");
-      router.push("/koleksi");
+      setShowArchiveSuccessModal(true);
     } catch (e) {
       setPageError(getErrorMessage(e, "Gagal menghapus buku"));
     } finally {
@@ -1286,6 +1287,44 @@ export default function KoleksiDetailPage() {
                   Batal
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+        {showArchiveSuccessModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+            <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              </div>
+
+              <h2 className="text-base font-bold text-slate-900">
+                Buku Berhasil Diarsipkan
+              </h2>
+
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Buku berhasil dipindahkan ke arsip dan tidak lagi tampil pada koleksi aktif.
+              </p>
+
+              <PrimaryButton
+                type="button"
+                onClick={() => router.push("/koleksi")}
+                className="mt-6 h-11 text-sm font-semibold"
+              >
+                Kembali ke Koleksi
+              </PrimaryButton>
             </div>
           </div>
         )}

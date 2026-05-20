@@ -207,7 +207,7 @@ export default function EditBookPage() {
         lokasi: lokasi.trim(),
         sinopsis: sinopsis.trim(),
         jumlah_eksemplar: jumlahEksemplar.trim(),
-        url_sampul: urlSampul.trim() ? urlSampul.trim() : null,
+        url_sampul: urlSampul.trim() ? urlSampul.trim() : "",
         isbn: isbn.trim(),
         bahasa: bahasa.trim(),
       });
