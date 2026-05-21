@@ -124,18 +124,65 @@ export default function LoanTrendPage() {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
 
+  // Format date to ISO string (YYYY-MM-DD)
+  const formatIsoDate = (d: Date) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  // Get date constraints
+  const getDateConstraints = () => {
+    const today = new Date();
+    const oneYearAgo = new Date(today);
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    return {
+      minDate: formatIsoDate(oneYearAgo),
+      maxDate: formatIsoDate(today),
+    };
+  };
+
+  const { minDate, maxDate } = getDateConstraints();
+
+  // Validate and constrain dates
+  const handleStartDateChange = (value: string) => {
+    if (!value) return;
+    
+    if (value < minDate) {
+      setStartDate(minDate);
+      setError("Tanggal mulai tidak boleh lebih dari 1 tahun sebelumnya");
+      return;
+    }
+    if (endDate && value > endDate) {
+      setError("Tanggal mulai tidak boleh melebihi tanggal akhir");
+      return;
+    }
+    setError(null);
+    setStartDate(value);
+  };
+
+  const handleEndDateChange = (value: string) => {
+    if (!value) return;
+    
+    if (value > maxDate) {
+      setEndDate(maxDate);
+      setError("Tanggal akhir tidak boleh melebihi hari ini");
+      return;
+    }
+    if (startDate && value < startDate) {
+      setError("Tanggal akhir tidak boleh kurang dari tanggal mulai");
+      return;
+    }
+    setError(null);
+    setEndDate(value);
+  };
+
   // Initialize dates to last 30 days
   useEffect(() => {
     const today = new Date();
     const thirtyDaysAgo = new Date(today);
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const formatIsoDate = (d: Date) => {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    };
 
     setStartDate(formatIsoDate(thirtyDaysAgo));
     setEndDate(formatIsoDate(today));
@@ -253,7 +300,9 @@ export default function LoanTrendPage() {
               <input
                 type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                min={minDate}
+                max={maxDate}
+                onChange={(e) => handleStartDateChange(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#6b3a22] focus:border-transparent text-black font-semibold bg-white"
               />
             </div>
@@ -265,7 +314,9 @@ export default function LoanTrendPage() {
               <input
                 type="date"
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                min={minDate}
+                max={maxDate}
+                onChange={(e) => handleEndDateChange(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#6b3a22] focus:border-transparent text-black font-semibold bg-white"
               />
             </div>
