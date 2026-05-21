@@ -3,6 +3,17 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, RefreshCw, ExternalLink } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  TooltipProps,
+} from "recharts";
 import { fetchPopularBooks, PopularBook, PopularBooksData } from "@/app/lib/peminjamanBuku";
 import ErrorMessage, { getErrorMessage } from "@/app/components/ErrorMessage";
 
@@ -26,6 +37,26 @@ function cleanAuthorName(raw: string): string {
   return cleaned || "Penulis tidak diketahui";
 }
 
+interface CustomTooltipProps extends TooltipProps<number, string> {
+  active?: boolean;
+  payload?: Array<{ value: number; payload: any }>;
+  label?: string;
+}
+
+function CustomTooltip({ active, payload }: CustomTooltipProps) {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white p-3 border border-gray-300 rounded shadow-lg">
+        <p className="text-gray-900 font-semibold">{payload[0].payload.judul}</p>
+        <p className="text-[#6b3a22] font-bold text-sm mt-1">
+          Peminjaman: {payload[0].value}
+        </p>
+      </div>
+    );
+  }
+  return null;
+}
+
 export default function PopularBooksPage() {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,6 +66,7 @@ export default function PopularBooksPage() {
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
 
   // Session check
   useEffect(() => {
@@ -44,6 +76,11 @@ export default function PopularBooksPage() {
       return;
     }
     setToken(storedToken);
+  }, []);
+
+  // Set mounted flag for hydration
+  useEffect(() => {
+    setIsMounted(true);
   }, []);
 
   // Fetch popular books
@@ -134,46 +171,61 @@ export default function PopularBooksPage() {
       {/* Header */}
       <div className="bg-[#6b3a22] text-white py-8 px-6">
         <div className="mx-auto max-w-6xl">
-          <div className="flex flex-col gap-6 items-start sm:items-center sm:justify-between sm:flex-row">
-            <div>
-              <h1 className="text-4xl font-bold">Buku Terpopuler</h1>
-              <p className="mt-2 text-[#e8d5c4]">Buku dengan jumlah peminjaman terbanyak</p>
-            </div>
-            
-            {/* Filter Section in Header */}
-            <div className="w-full sm:w-auto flex flex-col gap-2 sm:items-end">
-              <label className="text-sm font-semibold text-[#e8d5c4]">Filter Kategori</label>
-              <div className="flex gap-2 items-center w-full sm:w-auto">
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-white text-black font-semibold flex-1 sm:flex-none bg-white"
-                  style={{
-                    backgroundColor: 'white',
-                    color: 'black',
-                  }}
-                >
-                  <option value="" style={{ backgroundColor: 'white', color: 'black' }}>Semua Kategori</option>
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat} style={{ backgroundColor: 'white', color: 'black' }}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={handleRefresh}
-                  disabled={refreshing}
-                  className="px-4 py-2 bg-white hover:bg-gray-100 disabled:bg-gray-400 text-[#6b3a22] font-semibold rounded-lg flex items-center gap-2 transition-colors"
-                >
-                  <RefreshCw size={18} className={refreshing ? "animate-spin" : ""} />
-                </button>
-              </div>
-            </div>
+          <div className="flex flex-col gap-2">
+            <h1 className="text-4xl font-bold">Buku Terpopuler</h1>
+            <p className="text-[#e8d5c4]">Buku dengan jumlah peminjaman terbanyak</p>
           </div>
         </div>
       </div>
 
       <main className="mx-auto max-w-6xl px-6 py-10">
+        {/* Filter Section */}
+        <div className="mb-6 rounded-xl border-2 border-[#6b3a22] bg-white p-4 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+              Filter
+            </p>
+            {selectedCategory && (
+              <button
+                onClick={() => setSelectedCategory("")}
+                className="text-xs font-medium text-slate-500 hover:text-[#6b3a22] transition"
+              >
+                Hapus Filter
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-end gap-3">
+            {/* Jenis Koleksi */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-slate-500">Jenis Koleksi</label>
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-[#6b3a22] focus:ring-2 focus:ring-[#6b3a22]/20 cursor-pointer"
+              >
+                <option value="">Semua Kategori</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Refresh Button */}
+            <div className="flex items-end">
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 disabled:bg-gray-300 text-[#6b3a22] font-semibold rounded-lg flex items-center gap-2 transition-colors text-sm"
+              >
+                <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+                Refresh
+              </button>
+            </div>
+          </div>
+        </div>
 
         {/* Error Message */}
         {error && (
@@ -201,7 +253,42 @@ export default function PopularBooksPage() {
             <p className="text-gray-500 text-sm">Coba ubah kategori atau cek kembali nanti</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            {/* Horizontal Bar Chart */}
+            {isMounted && books.length > 0 && (
+              <div className="bg-white rounded-lg shadow p-6 border-2 border-[#6b3a22] mb-8">
+                <h2 className="text-xl font-bold text-[#6b3a22] mb-4">Visualisasi Buku Terpopuler</h2>
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart
+                    data={books}
+                    layout="vertical"
+                    margin={{ top: 5, right: 30, left: 250, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis type="number" stroke="#6b7280" style={{ fontSize: "12px" }} />
+                    <YAxis
+                      type="category"
+                      dataKey="judul"
+                      stroke="#6b7280"
+                      style={{ fontSize: "12px" }}
+                      width={240}
+                      interval={0}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(107, 58, 34, 0.1)" }} />
+                    <Legend />
+                    <Bar
+                      dataKey="jumlah_peminjaman"
+                      fill="#3b82f6"
+                      name="Jumlah Peminjaman"
+                      radius={[0, 8, 8, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-[#6b3a22] text-white">
@@ -261,6 +348,7 @@ export default function PopularBooksPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </main>
     </div>
