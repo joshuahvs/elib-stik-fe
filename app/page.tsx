@@ -1,6 +1,7 @@
 import Link from "next/link";
 import MasaAktifCardClient from "./components/MasaAktifCardClient";
 import ArticlesSlider from "./components/ArticlesSlider";
+import LandingSearchBar from "./components/LandingSearchBar";
 import { API_URL } from "./lib/api";
 
 async function getLanding() {
@@ -146,36 +147,60 @@ export default async function Home() {
   const visibleAnnouncements = sortedAnnouncements.slice(0, 3);
 
   return (
-    <main className="bg-[#F5F5F5]">
+    <main className="bg-[#F5F5F5] font-sans">
       {/* HERO */}
-      <section className="bg-gradient-to-r from-[#2A170C] to-[#512F16] text-white py-28">
-        <div className="max-w-7xl mx-auto px-8 grid md:grid-cols-2 gap-16 items-center">
-          {/* LEFT */}
-          <div>
-            <h1 className="text-6xl font-extrabold mb-4">{data.title}</h1>
+      <section className="relative overflow-hidden bg-gradient-to-r from-[#1A0F08] via-[#3B2212] to-[#6B3A22] text-white py-24">
+        <div className="absolute inset-0 opacity-40 [background:radial-gradient(circle_at_top_left,rgba(245,158,11,0.25),transparent_45%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.1),transparent_50%)]" />
+        <div className="absolute -top-20 right-0 h-72 w-72 rounded-full bg-[#F59E0B]/20 blur-3xl" />
+        <div className="absolute -bottom-24 left-0 h-80 w-96 rounded-full bg-black/30 blur-3xl" />
 
-            <p className="text-[#F59E0B] font-semibold mb-4 text-lg">
+        <div className="relative max-w-7xl mx-auto px-8 grid md:grid-cols-2 gap-16 items-center">
+          {/* LEFT */}
+          <div className="space-y-6 motion-safe:animate-[fade-up_0.8s_ease-out]">
+            <span className="inline-flex w-fit items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1 text-xs uppercase tracking-[0.3em] text-white/70">
+              E-Library STIK
+            </span>
+
+            <h1 className="text-5xl md:text-6xl font-extrabold leading-tight">
+              {data.title}
+            </h1>
+
+            <p className="text-[#F8C67A] font-semibold text-lg">
               {data.subtitle}
             </p>
 
-            <p className="text-gray-200 leading-relaxed mb-8">
+            <p className="text-white/80 leading-relaxed">
               E-Library STIK merupakan platform digital resmi yang menyediakan
               akses ke berbagai koleksi buku, jurnal, dan publikasi ilmiah guna
               mendukung kegiatan akademik, penelitian, dan pengembangan ilmu
               pengetahuan di lingkungan Sekolah Tinggi Ilmu Kepolisian.
             </p>
 
-            <div className="flex gap-4">
+            <LandingSearchBar />
+
+            <div className="flex flex-wrap gap-2 text-xs text-white/70">
+              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">
+                Akses 24/7
+              </span>
+              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">
+                Koleksi digital
+              </span>
+              <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1">
+                Pencarian cepat
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-4">
               <Link
                 href="/koleksi"
-                className="bg-[#D97706] hover:bg-[#B45309] px-6 py-3 rounded-lg font-semibold shadow-lg"
+                className="rounded-xl bg-[#F59E0B] px-6 py-3 font-semibold text-[#2A170C] shadow-[0_20px_40px_-25px_rgba(245,158,11,0.9)] transition hover:bg-[#D97706]"
               >
                 Explore Collection →
               </Link>
 
               <Link
                 href="/articles"
-                className="border border-white/30 px-6 py-3 rounded-lg hover:bg-white/10 transition"
+                className="rounded-xl border border-white/30 px-6 py-3 transition hover:bg-white/10"
               >
                 View Articles
               </Link>
@@ -183,11 +208,28 @@ export default async function Home() {
           </div>
 
           {/* RIGHT */}
-          <div>
+          <div className="relative motion-safe:animate-[fade-in_1s_ease-out]">
+            <div className="absolute -left-6 top-10 hidden w-44 rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-xs text-white/80 shadow-[0_20px_40px_-32px_rgba(0,0,0,0.8)] backdrop-blur sm:block">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-white/60">
+                Quick Search
+              </p>
+              <p className="mt-2 font-semibold text-white">
+                Temukan referensi dalam hitungan detik.
+              </p>
+            </div>
             <img
               src={data.image_url}
-              className="rounded-2xl shadow-2xl border border-white/10"
+              alt="E-Library STIK"
+              className="rounded-3xl border border-white/10 shadow-2xl"
             />
+            <div className="absolute -bottom-6 right-6 hidden rounded-2xl bg-white/95 px-4 py-3 text-[#2A170C] shadow-[0_25px_50px_-30px_rgba(15,23,42,0.9)] sm:block">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-[#B45309]">
+                Academic Focus
+              </p>
+              <p className="mt-1 text-sm font-semibold">
+                Sumber belajar resmi kampus.
+              </p>
+            </div>
           </div>
         </div>
       </section>
