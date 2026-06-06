@@ -944,9 +944,16 @@ export default function BorrowedBooksPage() {
 
                     const dueSoonText = (() => {
                       if (!isSoon || until == null) return null;
-                      if (until <= 0) return "Jatuh tempo hari ini";
-                      if (until === 1) return "Jatuh tempo besok";
-                      return `Jatuh tempo ${until} hari lagi`;
+                      let text = "";
+                      if (until <= 0) text = "Jatuh tempo hari ini";
+                      else if (until === 1) text = "Jatuh tempo besok";
+                      else text = `Jatuh tempo ${until} hari lagi.`;
+                      return (
+                        <>
+                          <div className="font-medium">{text}</div>
+                          <div className="opacity-90">Akan kena denda jika terlambat mengembalikan</div>
+                        </>
+                      );
                     })();
 
                     const canRequestExtension =
@@ -978,9 +985,11 @@ export default function BorrowedBooksPage() {
                                 : "—"}
                             </div>
                             {isSoon ? (
-                              <div className="mt-1 inline-flex items-center gap-1 text-xs text-orange-600">
-                                <AlertCircle className="h-3.5 w-3.5" />
-                                {dueSoonText ?? "Segera jatuh tempo!"}
+                              <div className="mt-1 flex items-start gap-1.5 text-xs text-orange-600">
+                                <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                                <div className="flex flex-col gap-0.5">
+                                  {dueSoonText ?? "Segera jatuh tempo!"}
+                                </div>
                               </div>
                             ) : null}
                           </div>

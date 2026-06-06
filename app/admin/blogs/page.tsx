@@ -419,6 +419,9 @@ export default function AdminBlogsPage() {
                         Status
                       </th>
                       <th className="px-6 py-3 text-left font-semibold">
+                        Diedit Oleh
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
                         Aksi
                       </th>
                     </tr>
@@ -427,7 +430,7 @@ export default function AdminBlogsPage() {
                     {isLoading ? (
                       <tr>
                         <td
-                          colSpan={7}
+                          colSpan={8}
                           className="px-6 py-6 text-center text-slate-500"
                         >
                           Memuat data blog...
@@ -436,7 +439,7 @@ export default function AdminBlogsPage() {
                     ) : blogs.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={7}
+                          colSpan={8}
                           className="px-6 py-6 text-center text-slate-500"
                         >
                           Belum ada blog.
@@ -493,6 +496,9 @@ export default function AdminBlogsPage() {
                               >
                                 {statusLabel(blog.status)}
                               </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-slate-600">
+                              {blog.updated_by ? blog.updated_by : "-"}
                             </td>
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-2">

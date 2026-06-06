@@ -13,6 +13,7 @@ export type AdminAnnouncement = {
   is_active?: boolean | null;
   created_at?: string | null;
   updated_at?: string | null;
+  updated_by?: string | null;
 };
 
 function pickFirstString(obj: any, keys: string[]): string | undefined {

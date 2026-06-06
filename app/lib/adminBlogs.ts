@@ -15,6 +15,7 @@ export type AdminBlog = {
   created_at?: string | null;
   updated_at?: string | null;
   published_at?: string | null;
+  updated_by?: string | null;
 };
 
 export const ADMIN_BLOG_MAX_FILE_BYTES = 5 * 1024 * 1024;
