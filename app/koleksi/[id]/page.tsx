@@ -21,7 +21,7 @@ type BookDigitalMeta = {
 
 type Review = {
   id: number;
-  user_name: string;
+  user_name: string | null;
   role?: string;
   rating: number;
   comment: string;
@@ -258,7 +258,15 @@ export default function KoleksiDetailPage() {
 
       console.log("REVIEWS DATA:", data); // debug
 
-      setReviews(Array.isArray(data) ? data : []);
+      const nextReviews = Array.isArray(data)
+        ? data
+        : Array.isArray((data as any)?.data)
+          ? (data as any).data
+          : Array.isArray((data as any)?.items)
+            ? (data as any).items
+            : [];
+
+      setReviews(nextReviews);
     } catch {
       setReviews([]);
     } finally {
@@ -473,6 +481,7 @@ export default function KoleksiDetailPage() {
           buku_id: Number(params.id),
           rating: ratingInput,
           comment: commentInput,
+          isi_ulasan: commentInput,
         }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -1034,11 +1043,11 @@ export default function KoleksiDetailPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#6b3a22]/10 text-sm font-bold text-[#6b3a22]">
-                        {r.user_name.charAt(0).toUpperCase()}
+                        {(r.user_name ?? "A").charAt(0).toUpperCase()}
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-slate-800">
-                          {r.user_name}
+                          {r.user_name ?? "Pengguna"}
                         </p>
                         <p className="text-xs text-slate-400">{r.created_at}</p>
                       </div>
@@ -1315,7 +1324,8 @@ export default function KoleksiDetailPage() {
               </h2>
 
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Buku berhasil dipindahkan ke arsip dan tidak lagi tampil pada koleksi aktif.
+                Buku berhasil dipindahkan ke arsip dan tidak lagi tampil pada
+                koleksi aktif.
               </p>
 
               <PrimaryButton

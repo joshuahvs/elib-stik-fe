@@ -420,6 +420,9 @@ export default function AdminAnnouncementsPage() {
                         Status
                       </th>
                       <th className="px-6 py-3 text-left font-semibold">
+                        Diedit Oleh
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
                         Aksi
                       </th>
                     </tr>
@@ -428,7 +431,7 @@ export default function AdminAnnouncementsPage() {
                     {isLoading ? (
                       <tr>
                         <td
-                          colSpan={7}
+                          colSpan={8}
                           className="px-6 py-6 text-center text-slate-500"
                         >
                           Memuat data pengumuman...
@@ -437,7 +440,7 @@ export default function AdminAnnouncementsPage() {
                     ) : announcements.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={7}
+                          colSpan={8}
                           className="px-6 py-6 text-center text-slate-500"
                         >
                           Belum ada pengumuman.
@@ -489,6 +492,9 @@ export default function AdminAnnouncementsPage() {
                               >
                                 {statusLabel(announcement)}
                               </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-slate-600">
+                              {announcement.updated_by ? announcement.updated_by : "-"}
                             </td>
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-2">
