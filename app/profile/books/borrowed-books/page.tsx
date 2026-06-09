@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, Calendar, Minus, Plus, X } from "lucide-react";
+import { AlertCircle, Calendar, Minus, Plus, X, BookOpen, Clock, ChevronLeft, ChevronRight, ArrowUpDown, Filter } from "lucide-react";
 import { fetchDigitalSignedUrl } from "@/app/lib/booksDigital";
 import {
   ajukanPerpanjanganPeminjaman,
@@ -31,7 +31,16 @@ type BorrowedBook = {
   statusPerpanjangan?: string;
   akhirPerpanjangan?: string;
   catatan?: string;
+  urlSampul?: string;
 };
+
+const FALLBACK_COVER =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='533' fill='%23f1f5f9'%3E%3Crect width='400' height='533' rx='8'/%3E%3Ctext x='50%25' y='42%25' text-anchor='middle' fill='%2394a3b8' font-family='sans-serif' font-size='42' font-weight='700' dy='.3em'%3E📖%3C/text%3E%3Ctext x='50%25' y='56%25' text-anchor='middle' fill='%23cbd5e1' font-family='sans-serif' font-size='24' font-weight='600' dy='.3em'%3ENo Cover%3C/text%3E%3C/svg%3E";
+
+function cleanText(text: string | null | undefined): string {
+  if (!text) return "";
+  return text.replace(/[\[\]'"]/g, "").trim();
+}
 
 function pickFirstString(obj: any, keys: string[]): string | undefined {
   for (const k of keys) {
@@ -77,8 +86,8 @@ function mapLoanToBorrowedBook(row: any): BorrowedBook {
     "(Tanpa judul)";
 
   const penulis =
-    pickFirstString(buku, ["penulis", "author", "pengarang"]) ??
-    pickFirstString(row, ["penulis", "author"]) ??
+    pickFirstString(buku, ["penulis", "author", "pengarang", "nama_orang"]) ??
+    pickFirstString(row, ["penulis", "author", "nama_orang"]) ??
     "-";
 
   const tanggalPinjam = toIsoDate(
@@ -125,6 +134,12 @@ function mapLoanToBorrowedBook(row: any): BorrowedBook {
       ? row.catatan.trim() || undefined
       : undefined;
 
+  // Extract cover URL from the buku relation
+  const urlSampulRaw =
+    pickFirstString(buku, ["url_sampul", "urlSampul", "cover_url", "coverUrl"]) ??
+    pickFirstString(row, ["url_sampul", "urlSampul", "cover_url", "coverUrl"]);
+  const urlSampul = urlSampulRaw ? cleanText(urlSampulRaw) || undefined : undefined;
+
   return {
     id: String(loanId),
     bukuId,
@@ -138,6 +153,7 @@ function mapLoanToBorrowedBook(row: any): BorrowedBook {
     statusPerpanjangan,
     akhirPerpanjangan,
     catatan,
+    urlSampul,
   };
 }
 
@@ -218,34 +234,54 @@ function getEffectiveDueDate(item: BorrowedBook): string {
   return item.jatuhTempo;
 }
 
-function StatusPill({ status }: { status: BorrowStatus }) {
-  const className =
-    status === "Dikembalikan"
-      ? "bg-slate-100 text-slate-700"
-      : status === "Diajukan"
-        ? "bg-blue-50 text-blue-700 border border-blue-200"
-        : status === "Ditolak"
-          ? "bg-rose-50 text-rose-700 border border-rose-200"
-          : status === "Disetujui"
-            ? "bg-emerald-600 text-white"
-            : status === "Terlambat"
-              ? "bg-rose-600 text-white"
-              : "bg-indigo-50 text-indigo-700 border border-indigo-200";
-
+/* ───────── Status Badge Component ───────── */
+function StatusBadge({ status }: { status: BorrowStatus }) {
+  const config: Record<BorrowStatus, { bg: string; text: string; dot: string; border: string }> = {
+    Dikembalikan: { bg: "bg-slate-50", text: "text-slate-600", dot: "bg-slate-400", border: "border-slate-200" },
+    Diajukan: { bg: "bg-amber-50", text: "text-amber-700", dot: "bg-amber-400", border: "border-amber-200" },
+    Ditolak: { bg: "bg-rose-50", text: "text-rose-700", dot: "bg-rose-400", border: "border-rose-200" },
+    Disetujui: { bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-400", border: "border-emerald-200" },
+    Terlambat: { bg: "bg-red-50", text: "text-red-700", dot: "bg-red-500", border: "border-red-200" },
+    Dipinjam: { bg: "bg-indigo-50", text: "text-indigo-700", dot: "bg-indigo-400", border: "border-indigo-200" },
+  };
+  const c = config[status];
   return (
-    <span
-      className={[
-        "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
-        className,
-      ]
-        .filter(Boolean)
-        .join(" ")}
-    >
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${c.bg} ${c.text} ${c.border}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${c.dot}`} />
       {status}
     </span>
   );
 }
 
+/* ───────── Due Date Progress ───────── */
+function DueDateIndicator({ daysLeft, isPastDue, isReturned }: { daysLeft: number | null; isPastDue: boolean; isReturned: boolean }) {
+  if (isReturned || daysLeft == null) return null;
+
+  if (isPastDue) {
+    const overdue = Math.max(1, -daysLeft);
+    return (
+      <div className="mt-2 flex items-center gap-1.5 text-xs text-red-600 font-medium">
+        <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+        <span>Terlambat {overdue} hari</span>
+      </div>
+    );
+  }
+
+  if (daysLeft <= 3) {
+    return (
+      <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-600 font-medium">
+        <Clock className="h-3.5 w-3.5 shrink-0" />
+        <span>
+          {daysLeft <= 0 ? "Jatuh tempo hari ini" : daysLeft === 1 ? "Jatuh tempo besok" : `${daysLeft} hari lagi`}
+        </span>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+/* ───────── Perpanjangan Modal ───────── */
 type PerpanjanganModalProps = {
   open: boolean;
   judulBuku: string;
@@ -289,9 +325,9 @@ function PerpanjanganModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-      <div className="absolute inset-0 bg-slate-900/50" />
+      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => { if (!submitting) onClose(); }} />
 
-      <div className="relative w-full max-w-xl rounded-2xl bg-white shadow-xl border">
+      <div className="relative w-full max-w-xl rounded-2xl bg-white shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
         <div className="flex items-start justify-between gap-4 px-8 pt-7">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">
@@ -307,7 +343,7 @@ function PerpanjanganModal({
             onClick={() => {
               if (!submitting) onClose();
             }}
-            className="rounded-lg p-2 text-slate-500 hover:bg-slate-50"
+            className="rounded-lg p-2 text-slate-500 hover:bg-slate-50 transition-colors"
             aria-label="Tutup"
           >
             <X className="h-5 w-5" />
@@ -332,10 +368,10 @@ function PerpanjanganModal({
                   onClick={() => setPreset(n)}
                   disabled={submitting}
                   className={[
-                    "rounded-xl border px-4 py-4 text-center transition-colors",
+                    "rounded-xl border px-4 py-4 text-center transition-all duration-200",
                     isActive
-                      ? "bg-gradient-to-r from-[#733015] to-[#8b5529] text-white border-transparent"
-                      : "bg-white text-slate-900 border-slate-200 hover:bg-slate-50",
+                      ? "bg-gradient-to-r from-[#733015] to-[#8b5529] text-white border-transparent shadow-lg shadow-[#733015]/20"
+                      : "bg-white text-slate-900 border-slate-200 hover:bg-slate-50 hover:border-slate-300",
                     submitting ? "opacity-80" : "",
                   ]
                     .filter(Boolean)
@@ -367,8 +403,8 @@ function PerpanjanganModal({
               onClick={dec}
               disabled={submitting || selected <= 1}
               className={[
-                "h-10 w-10 rounded-lg border flex items-center justify-center",
-                "bg-slate-50 text-slate-700 border-slate-200",
+                "h-10 w-10 rounded-lg border flex items-center justify-center transition-colors",
+                "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100",
                 "disabled:opacity-50 disabled:cursor-not-allowed",
               ].join(" ")}
               aria-label="Kurangi hari"
@@ -394,8 +430,8 @@ function PerpanjanganModal({
               onClick={inc}
               disabled={submitting || selected >= 30}
               className={[
-                "h-10 w-10 rounded-lg border flex items-center justify-center",
-                "bg-slate-50 text-slate-700 border-slate-200",
+                "h-10 w-10 rounded-lg border flex items-center justify-center transition-colors",
+                "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100",
                 "disabled:opacity-50 disabled:cursor-not-allowed",
               ].join(" ")}
               aria-label="Tambah hari"
@@ -412,7 +448,7 @@ function PerpanjanganModal({
               }}
               disabled={submitting}
               className={[
-                "h-10 rounded-lg border px-4 text-sm font-medium",
+                "h-10 rounded-lg border px-4 text-sm font-medium transition-colors",
                 "border-slate-200 text-slate-700 hover:bg-slate-50",
                 "disabled:opacity-60 disabled:cursor-not-allowed",
               ].join(" ")}
@@ -424,8 +460,9 @@ function PerpanjanganModal({
               onClick={onSubmit}
               disabled={submitting}
               className={[
-                "h-10 rounded-lg px-4 text-sm font-medium text-white",
-                "bg-gradient-to-r from-[#733015] to-[#8b5529]",
+                "h-10 rounded-lg px-4 text-sm font-medium text-white transition-all",
+                "bg-gradient-to-r from-[#733015] to-[#8b5529] shadow-lg shadow-[#733015]/20",
+                "hover:shadow-xl hover:shadow-[#733015]/30",
                 "disabled:opacity-60 disabled:cursor-not-allowed",
               ].join(" ")}
             >
@@ -438,6 +475,7 @@ function PerpanjanganModal({
   );
 }
 
+/* ───────── Konfirmasi Perpanjangan Modal ───────── */
 type KonfirmasiPerpanjanganModalProps = {
   open: boolean;
   judulBuku: string;
@@ -459,9 +497,9 @@ function KonfirmasiPerpanjanganModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
-      <div className="absolute inset-0 bg-slate-900/50" />
+      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" />
 
-      <div className="relative w-full max-w-md rounded-2xl border bg-white p-6 shadow-xl">
+      <div className="relative w-full max-w-md rounded-2xl border bg-white p-6 shadow-2xl">
         <h3 className="text-lg font-semibold text-slate-900">
           Konfirmasi Perpanjangan
         </h3>
@@ -482,7 +520,7 @@ function KonfirmasiPerpanjanganModal({
             type="button"
             onClick={onClose}
             disabled={submitting}
-            className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
           >
             Batal
           </button>
@@ -490,7 +528,7 @@ function KonfirmasiPerpanjanganModal({
             type="button"
             onClick={onConfirm}
             disabled={submitting}
-            className="h-10 rounded-lg bg-gradient-to-r from-[#733015] to-[#8b5529] px-4 text-sm font-medium text-white disabled:opacity-60 disabled:cursor-not-allowed"
+            className="h-10 rounded-lg bg-gradient-to-r from-[#733015] to-[#8b5529] px-4 text-sm font-medium text-white shadow-lg shadow-[#733015]/20 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
           >
             {submitting ? "Memproses…" : "Ya, Ajukan"}
           </button>
@@ -500,6 +538,27 @@ function KonfirmasiPerpanjanganModal({
   );
 }
 
+/* ───────── Skeleton Card ───────── */
+function SkeletonCard() {
+  return (
+    <div className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="relative aspect-[3/4] w-full overflow-hidden bg-slate-100">
+        <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-slate-200 via-slate-100 to-slate-200" />
+      </div>
+      <div className="flex flex-col gap-3 p-4">
+        <div className="h-4 w-3/4 animate-pulse rounded-full bg-slate-200" />
+        <div className="h-3 w-1/2 animate-pulse rounded-full bg-slate-200" />
+        <div className="flex gap-2">
+          <div className="h-6 w-16 animate-pulse rounded-full bg-slate-200" />
+          <div className="h-6 w-20 animate-pulse rounded-full bg-slate-200" />
+        </div>
+        <div className="h-8 w-full animate-pulse rounded-lg bg-slate-100" />
+      </div>
+    </div>
+  );
+}
+
+/* ───────── Main Page Component ───────── */
 export default function BorrowedBooksPage() {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -744,33 +803,74 @@ export default function BorrowedBooksPage() {
     };
   }, [page, pageSize, refreshKey, token, filterStatus, sortBy, sortOrder]);
 
+  // Count stats for the header
+  const activeCount = useMemo(() => {
+    return pageItems.filter((b) => {
+      const s = getStatus(b, now);
+      return s === "Dipinjam" || s === "Disetujui" || s === "Diajukan";
+    }).length;
+  }, [pageItems, now]);
+
   return (
-    <div className="min-h-screen bg-white">
-      <main className="mx-auto max-w-6xl px-6 py-10">
-        <div className="flex items-start justify-between gap-6">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">
-              Riwayat Peminjaman
-            </h1>
-            <p className="mt-2 text-slate-600">
-              Daftar buku yang sedang atau pernah kamu pinjam.
-            </p>
+    <div className="min-h-screen bg-slate-50">
+      {/* ── Hero Header ── */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-[#4A2612] via-[#6B3A22] to-[#8A4D2E] text-white">
+        {/* Decorative blobs */}
+        <div className="absolute inset-0 opacity-40 [background:radial-gradient(circle_at_top_left,rgba(245,158,11,0.25),transparent_45%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_50%)]" />
+        <div className="absolute -top-24 right-0 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute -bottom-24 left-0 h-72 w-72 rounded-full bg-black/30 blur-3xl" />
+
+        <div className="relative mx-auto max-w-6xl px-6 py-10 md:py-14">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20">
+              <BookOpen className="h-7 w-7 text-white/90" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/60">
+                E-Library STIK
+              </p>
+              <h1 className="mt-1 text-2xl font-bold tracking-tight md:text-3xl">
+                Riwayat Peminjaman
+              </h1>
+            </div>
           </div>
+          <p className="mt-3 max-w-xl text-sm text-white/70">
+            Daftar buku yang sedang atau pernah kamu pinjam. Pantau status, jatuh tempo, dan kelola perpanjangan peminjaman di sini.
+          </p>
+
+          {/* Quick stats */}
+          {!loading && token && (
+            <div className="mt-6 flex flex-wrap gap-3">
+              <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 backdrop-blur-sm">
+                <div className="text-lg font-bold">{totalItems}</div>
+                <div className="text-[11px] font-medium text-white/60">Total Peminjaman</div>
+              </div>
+              {activeCount > 0 && (
+                <div className="rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 backdrop-blur-sm">
+                  <div className="text-lg font-bold">{activeCount}</div>
+                  <div className="text-[11px] font-medium text-white/60">Sedang Aktif</div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
+      </div>
 
-        <ErrorMessage error={actionError} className="mt-6" />
+      <main className="mx-auto max-w-6xl px-6 py-8">
+        <ErrorMessage error={actionError} className="mb-6" />
 
-        {/* Filter and Sort Controls */}
-        <div className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:gap-6">
-          {/* Status Filter Dropdown */}
-          <div className="flex flex-col gap-2 flex-1">
-            <label className="text-sm font-semibold text-slate-900">
+        {/* ── Filter & Sort Controls ── */}
+        <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:flex-row lg:items-end lg:gap-6">
+          {/* Status Filter */}
+          <div className="flex flex-col gap-1.5 flex-1">
+            <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              <Filter className="h-3.5 w-3.5" />
               Filter Status
             </label>
             <select
               value={filterStatus || ""}
               onChange={(e) => handleFilterStatusChange(e.target.value || null)}
-              className="px-4 py-2 rounded-lg text-sm border border-slate-200 bg-white text-slate-900 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#733015]/20 focus:border-[#733015]"
+              className="h-10 px-4 rounded-xl text-sm border border-slate-200 bg-slate-50 text-slate-900 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#733015]/20 focus:border-[#733015] transition-colors"
             >
               <option value="">Semua Status</option>
               <option value="DIAJUKAN">Diajukan</option>
@@ -783,9 +883,10 @@ export default function BorrowedBooksPage() {
           </div>
 
           {/* Sort Options */}
-          <div className="flex flex-col gap-2 flex-1">
-            <label className="text-sm font-semibold text-slate-900">
-              Urutkan Berdasarkan
+          <div className="flex flex-col gap-1.5 flex-1">
+            <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              <ArrowUpDown className="h-3.5 w-3.5" />
+              Urutkan
             </label>
             <div className="flex gap-2">
               {[
@@ -796,15 +897,15 @@ export default function BorrowedBooksPage() {
                   key={option.value}
                   onClick={() => handleSortChange(option.value)}
                   className={[
-                    "px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2",
+                    "h-10 px-4 rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-2",
                     sortBy === option.value
-                      ? "bg-gradient-to-r from-[#733015] to-[#8b5529] text-white"
-                      : "bg-slate-100 text-slate-700 hover:bg-slate-200",
+                      ? "bg-gradient-to-r from-[#733015] to-[#8b5529] text-white shadow-md shadow-[#733015]/20"
+                      : "bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200",
                   ].join(" ")}
                 >
                   {option.label}
                   {sortBy === option.value && (
-                    <span className="text-xs">
+                    <span className="text-xs opacity-80">
                       {sortOrder === "asc" ? "↑" : "↓"}
                     </span>
                   )}
@@ -814,356 +915,317 @@ export default function BorrowedBooksPage() {
           </div>
         </div>
 
-        <ErrorMessage error={actionError} className="mt-6" />
+        {/* ── Result Count ── */}
+        {!loading && totalItems > 0 && (
+          <p className="mb-5 text-sm text-slate-500">
+            Menampilkan{" "}
+            <span className="font-semibold text-slate-700">{startIndex}</span>
+            –
+            <span className="font-semibold text-slate-700">{endIndex}</span>
+            {" "}dari{" "}
+            <span className="font-semibold text-slate-700">{totalItems}</span>
+            {" "}peminjaman
+          </p>
+        )}
 
-        <section className="mt-8 rounded-2xl border border-slate-200 bg-white">
-          <div className="border-b border-slate-200 px-6 py-5">
-            <div className="text-sm text-slate-600">
-              {loading ? (
-                "Memuat data pinjaman…"
-              ) : totalItems === 0 ? (
-                "Belum ada data pinjaman."
-              ) : (
-                <>
-                  Menampilkan{" "}
-                  <span className="font-semibold text-slate-900">
-                    {startIndex}
-                  </span>
-                  –
-                  <span className="font-semibold text-slate-900">
-                    {endIndex}
-                  </span>{" "}
-                  dari{" "}
-                  <span className="font-semibold text-slate-900">
-                    {totalItems}
-                  </span>
-                </>
-              )}
+        {/* ── Content ── */}
+        {!token && !loading ? (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white py-20 text-slate-500">
+            <BookOpen className="mb-4 h-12 w-12 text-slate-300" />
+            <p className="text-base font-semibold text-slate-600">Kamu belum login</p>
+            <p className="mt-1 text-sm">Silakan masuk dulu untuk melihat riwayat peminjaman.</p>
+            <Link href="/auth/login" className="mt-5 inline-flex h-10 items-center rounded-xl bg-gradient-to-r from-[#733015] to-[#8b5529] px-6 text-sm font-semibold text-white shadow-lg shadow-[#733015]/20 transition-all hover:shadow-xl">
+              Ke halaman login
+            </Link>
+          </div>
+        ) : loading ? (
+          /* Skeleton Loading Grid */
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: pageSize }).map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
+        ) : error ? (
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <ErrorMessage error={error} />
+          </div>
+        ) : totalItems === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white py-20 text-slate-500">
+            <BookOpen className="mb-4 h-12 w-12 text-slate-300" />
+            <p className="text-base font-semibold text-slate-600">Belum ada buku yang kamu pinjam</p>
+            <p className="mt-1 text-sm">Jelajahi koleksi perpustakaan untuk mulai meminjam.</p>
+            <Link href="/koleksi" className="mt-5 inline-flex h-10 items-center rounded-xl bg-gradient-to-r from-[#733015] to-[#8b5529] px-6 text-sm font-semibold text-white shadow-lg shadow-[#733015]/20 transition-all hover:shadow-xl">
+              Jelajahi Koleksi
+            </Link>
+          </div>
+        ) : (
+          /* ── Book Cards Grid ── */
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {pageItems.map((item) => {
+              const status = getStatus(item, now);
+              const perpanjanganLabel = formatPerpanjanganStatus(item.statusPerpanjangan);
+              const effectiveDueDate = getEffectiveDueDate(item);
+              const showAlasanDitolak =
+                Boolean(item.catatan) &&
+                (status === "Ditolak" || perpanjanganLabel === "Ditolak");
+
+              const isReturned =
+                status === "Dikembalikan" || Boolean(item.tanggalKembali);
+
+              const returnedDeltaDays = (() => {
+                if (!isReturned || !item.tanggalKembali) return null;
+                const dueUtc = isoDateToUtcMs(effectiveDueDate);
+                const returnedUtc = isoDateToUtcMs(item.tanggalKembali);
+                if (dueUtc == null || returnedUtc == null) return null;
+                const msPerDay = 24 * 60 * 60 * 1000;
+                return Math.round((returnedUtc - dueUtc) / msPerDay);
+              })();
+
+              const returnedLateDays =
+                returnedDeltaDays != null && returnedDeltaDays > 0
+                  ? returnedDeltaDays
+                  : null;
+
+              const returnedOnTime =
+                returnedDeltaDays != null && returnedDeltaDays <= 0;
+
+              const until = daysUntilDue(effectiveDueDate, now);
+
+              const dueAt = effectiveDueDate
+                ? new Date(`${effectiveDueDate}T23:59:59`)
+                : null;
+              const hasPassedDueDate =
+                dueAt != null &&
+                !Number.isNaN(dueAt.getTime()) &&
+                now > dueAt;
+              const isPastDue = !isReturned && hasPassedDueDate;
+
+              const canRequestExtension =
+                (status === "Dipinjam" || status === "Disetujui") &&
+                !isReturned &&
+                !hasPassedDueDate;
+
+              return (
+                <div
+                  key={item.id}
+                  className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-slate-200/60"
+                >
+                  {/* ── Card Top: Book Cover + Overlay Info ── */}
+                  <div className="relative flex gap-0">
+                    {/* Cover image */}
+                    <div className="relative w-28 shrink-0 overflow-hidden bg-slate-100 sm:w-32">
+                      <div className="aspect-[3/4] w-full">
+                        <img
+                          src={item.urlSampul || FALLBACK_COVER}
+                          alt={`Cover ${item.judul}`}
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            img.onerror = null;
+                            img.src = FALLBACK_COVER;
+                          }}
+                          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                      </div>
+                      {/* Status overlay on image */}
+                      <div className="absolute top-2 left-2">
+                        <StatusBadge status={status} />
+                      </div>
+                    </div>
+
+                    {/* Right side info */}
+                    <div className="flex flex-1 flex-col justify-between p-4">
+                      {/* Title & Author */}
+                      <div>
+                        <h3 className="line-clamp-2 text-sm font-bold leading-snug text-slate-900 group-hover:text-[#733015] transition-colors">
+                          {item.judul}
+                        </h3>
+                        <p className="mt-1 line-clamp-1 text-xs text-slate-500">
+                          {cleanText(item.penulis) || "Penulis tidak diketahui"}
+                        </p>
+                      </div>
+
+                      {/* Dates */}
+                      <div className="mt-3 space-y-1.5">
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                          <Calendar className="h-3 w-3 shrink-0 text-slate-400" />
+                          <span>Pinjam: {item.tanggalPinjam ? formatDate(item.tanggalPinjam) : "—"}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                          <Clock className="h-3 w-3 shrink-0 text-slate-400" />
+                          <span>Tempo: {effectiveDueDate ? formatDate(effectiveDueDate) : "—"}</span>
+                        </div>
+                        {item.tanggalKembali && (
+                          <div className="flex items-center gap-2 text-xs text-slate-500">
+                            <BookOpen className="h-3 w-3 shrink-0 text-slate-400" />
+                            <span>Kembali: {formatDate(item.tanggalKembali)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Due date warning */}
+                      <DueDateIndicator daysLeft={until} isPastDue={isPastDue} isReturned={isReturned} />
+                    </div>
+                  </div>
+
+                  {/* ── Card Bottom: Extended Info & Actions ── */}
+                  <div className="border-t border-slate-100 px-4 pb-4 pt-3">
+                    {/* Return status badge */}
+                    {returnedLateDays ? (
+                      <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-rose-50 border border-rose-200 px-2.5 py-1 text-xs font-medium text-rose-700">
+                        <AlertCircle className="h-3 w-3" />
+                        Dikembalikan terlambat {returnedLateDays} hari
+                      </div>
+                    ) : returnedOnTime ? (
+                      <div className="mb-2 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                        ✓ Dikembalikan tepat waktu
+                      </div>
+                    ) : null}
+
+                    {/* Perpanjangan info */}
+                    {perpanjanganLabel ? (
+                      <div className="mb-2 rounded-lg bg-slate-50 p-2.5 text-xs text-slate-600">
+                        <span className="font-semibold text-slate-800">Perpanjangan: </span>
+                        <span className={
+                          perpanjanganLabel === "Disetujui"
+                            ? "text-emerald-600 font-semibold"
+                            : perpanjanganLabel === "Ditolak"
+                              ? "text-rose-600 font-semibold"
+                              : "text-amber-600 font-semibold"
+                        }>
+                          {perpanjanganLabel}
+                        </span>
+                        {item.akhirPerpanjangan && (
+                          <span className="text-slate-400"> · hingga {formatDate(item.akhirPerpanjangan)}</span>
+                        )}
+                      </div>
+                    ) : null}
+
+                    {/* Rejection reason */}
+                    {showAlasanDitolak ? (
+                      <div className="mb-2 rounded-lg bg-rose-50 border border-rose-100 p-2.5 text-xs text-rose-700">
+                        <span className="font-semibold">Alasan ditolak: </span>
+                        {item.catatan}
+                      </div>
+                    ) : null}
+
+                    {/* Overdue warning in card */}
+                    {isPastDue && (
+                      <div className="mb-2 rounded-lg bg-red-50 border border-red-100 p-2.5 text-xs text-red-700 flex items-start gap-1.5">
+                        <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        <span>Akan kena denda jika tidak segera mengembalikan.</span>
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {item.bukuId && (
+                        <Link
+                          href={`/koleksi/${encodeURIComponent(item.bukuId)}`}
+                          className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-colors"
+                        >
+                          Lihat Detail
+                        </Link>
+                      )}
+
+                      {item.digitalId && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleOpenDigital(item.digitalId!, item.judul)
+                          }
+                          disabled={openingDigitalId === item.digitalId}
+                          className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {openingDigitalId === item.digitalId
+                            ? "Membuka…"
+                            : "📖 Baca Digital"}
+                        </button>
+                      )}
+
+                      {canRequestExtension && (
+                        <button
+                          type="button"
+                          onClick={() => openPerpanjangan(item)}
+                          className="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold text-white bg-gradient-to-r from-[#733015] to-[#8b5529] shadow-md shadow-[#733015]/20 hover:shadow-lg hover:shadow-[#733015]/30 transition-all"
+                        >
+                          <Calendar className="h-3 w-3" />
+                          Perpanjang
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Pagination ── */}
+        {totalItems > 0 && !loading && !error && token ? (
+          <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
+            <div className="text-sm text-slate-500">
+              Halaman{" "}
+              <span className="font-semibold text-slate-900">{page}</span>{" "}
+              dari{" "}
+              <span className="font-semibold text-slate-900">
+                {totalPages}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                className={[
+                  "h-9 w-9 flex items-center justify-center rounded-xl border text-sm transition-all",
+                  page <= 1
+                    ? "text-slate-300 border-slate-200 cursor-not-allowed"
+                    : "text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300",
+                ].join(" ")}
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                aria-label="Halaman sebelumnya"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+
+              {pageNumbers.map((p) => {
+                const isActive = p === page;
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    className={[
+                      "h-9 min-w-9 px-3 rounded-xl text-sm font-medium border transition-all",
+                      isActive
+                        ? "bg-gradient-to-r from-[#733015] to-[#8b5529] text-white border-transparent shadow-md shadow-[#733015]/20"
+                        : "text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300",
+                    ].join(" ")}
+                    onClick={() => setPage(p)}
+                  >
+                    {p}
+                  </button>
+                );
+              })}
+
+              <button
+                type="button"
+                className={[
+                  "h-9 w-9 flex items-center justify-center rounded-xl border text-sm transition-all",
+                  page >= totalPages
+                    ? "text-slate-300 border-slate-200 cursor-not-allowed"
+                    : "text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-slate-300",
+                ].join(" ")}
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                aria-label="Halaman berikutnya"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
             </div>
           </div>
+        ) : null}
 
-          {!token && !loading ? (
-            <div className="px-6 py-12 text-center text-slate-600">
-              Kamu belum login. Silakan masuk dulu.
-              <div className="mt-4">
-                <Link href="/auth/login" className="underline text-slate-900">
-                  Ke halaman login
-                </Link>
-              </div>
-            </div>
-          ) : loading ? (
-            <div className="px-6 py-12 text-center text-slate-600">Memuat…</div>
-          ) : error ? (
-            <div className="px-6 py-6">
-              <ErrorMessage error={error} />
-            </div>
-          ) : totalItems === 0 ? (
-            <div className="px-6 py-12 text-center text-slate-600">
-              Belum ada buku yang kamu pinjam.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-full table-fixed text-sm">
-                <colgroup>
-                  <col className="w-32" />
-                  <col />
-                  <col className="w-36" />
-                  <col className="w-36" />
-                  <col className="w-52" />
-                  <col className="w-52" />
-                </colgroup>
-                <thead className="bg-slate-50 text-slate-700">
-                  <tr>
-                    <th className="px-6 py-3 text-left font-semibold whitespace-nowrap">
-                      Peminjaman #
-                    </th>
-                    <th className="text-left font-semibold px-6 py-3">Buku</th>
-                    <th className="text-left font-semibold px-6 py-3">
-                      Tanggal Pinjam
-                    </th>
-                    <th className="text-left font-semibold px-6 py-3">
-                      Jatuh Tempo
-                    </th>
-                    <th className="text-left font-semibold px-6 py-3">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-right font-semibold">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {pageItems.map((item, idx) => {
-                    const status = getStatus(item, now);
-                    const perpanjanganLabel = formatPerpanjanganStatus(
-                      item.statusPerpanjangan,
-                    );
-                    const effectiveDueDate = getEffectiveDueDate(item);
-                    const showAlasanDitolak =
-                      Boolean(item.catatan) &&
-                      (status === "Ditolak" || perpanjanganLabel === "Ditolak");
-
-                    const isReturned =
-                      status === "Dikembalikan" || Boolean(item.tanggalKembali);
-
-                    const returnedDeltaDays = (() => {
-                      if (!isReturned || !item.tanggalKembali) return null;
-                      const dueUtc = isoDateToUtcMs(effectiveDueDate);
-                      const returnedUtc = isoDateToUtcMs(item.tanggalKembali);
-                      if (dueUtc == null || returnedUtc == null) return null;
-                      const msPerDay = 24 * 60 * 60 * 1000;
-                      return Math.round((returnedUtc - dueUtc) / msPerDay);
-                    })();
-
-                    const returnedLateDays =
-                      returnedDeltaDays != null && returnedDeltaDays > 0
-                        ? returnedDeltaDays
-                        : null;
-
-                    const returnedOnTime =
-                      returnedDeltaDays != null && returnedDeltaDays <= 0;
-
-                    const until = daysUntilDue(effectiveDueDate, now);
-
-                    const dueAt = effectiveDueDate
-                      ? new Date(`${effectiveDueDate}T23:59:59`)
-                      : null;
-                    const hasPassedDueDate =
-                      dueAt != null &&
-                      !Number.isNaN(dueAt.getTime()) &&
-                      now > dueAt;
-                    const isPastDue = !isReturned && hasPassedDueDate;
-
-                    const overdueDays =
-                      isPastDue && until != null ? Math.max(1, -until) : null;
-
-                    const isSoon =
-                      !isPastDue &&
-                      until != null &&
-                      until >= 0 &&
-                      until <= 3 &&
-                      !item.tanggalKembali;
-
-                    const dueSoonText = (() => {
-                      if (!isSoon || until == null) return null;
-                      let text = "";
-                      if (until <= 0) text = "Jatuh tempo hari ini";
-                      else if (until === 1) text = "Jatuh tempo besok";
-                      else text = `Jatuh tempo ${until} hari lagi.`;
-                      return (
-                        <>
-                          <div className="font-medium">{text}</div>
-                          <div className="opacity-90">Akan kena denda jika terlambat mengembalikan</div>
-                        </>
-                      );
-                    })();
-
-                    const canRequestExtension =
-                      (status === "Dipinjam" || status === "Disetujui") &&
-                      !isReturned &&
-                      !hasPassedDueDate;
-
-                    return (
-                      <tr key={item.id} className="hover:bg-slate-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-slate-700">
-                          {startIndex + idx}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="font-semibold text-slate-900">
-                            {item.judul}
-                          </div>
-                          <div className="text-slate-600">{item.penulis}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-slate-700">
-                          {item.tanggalPinjam
-                            ? formatDate(item.tanggalPinjam)
-                            : "—"}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-slate-700">
-                          <div className="flex flex-col items-start">
-                            <div>
-                              {effectiveDueDate
-                                ? formatDate(effectiveDueDate)
-                                : "—"}
-                            </div>
-                            {isSoon ? (
-                              <div className="mt-1 flex items-start gap-1.5 text-xs text-orange-600">
-                                <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                                <div className="flex flex-col gap-0.5">
-                                  {dueSoonText ?? "Segera jatuh tempo!"}
-                                </div>
-                              </div>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 align-top">
-                          <div className="flex flex-col items-start gap-2">
-                            <StatusPill status={status} />
-                            {returnedLateDays ? (
-                              <div className="inline-flex items-center gap-1 text-xs text-rose-700">
-                                <AlertCircle className="h-3.5 w-3.5" />
-                                Dikembalikan terlambat {returnedLateDays} hari
-                              </div>
-                            ) : returnedOnTime ? (
-                              <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                                Tepat waktu
-                              </span>
-                            ) : null}
-                            {perpanjanganLabel ? (
-                              <div className="text-xs text-slate-600 whitespace-normal break-words">
-                                <span className="font-medium text-slate-900">
-                                  Perpanjangan:
-                                </span>{" "}
-                                {perpanjanganLabel}
-                                {item.akhirPerpanjangan ? (
-                                  <>
-                                    <span className="text-slate-400"> · </span>
-                                    <span>
-                                      hingga{" "}
-                                      {formatDate(item.akhirPerpanjangan)}
-                                    </span>
-                                  </>
-                                ) : null}
-                              </div>
-                            ) : null}
-                            {showAlasanDitolak ? (
-                              <div className="text-xs text-rose-700 whitespace-normal break-words">
-                                <span className="font-medium">
-                                  Alasan ditolak:
-                                </span>{" "}
-                                {item.catatan}
-                              </div>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 align-top">
-                          <div className="flex flex-col items-end gap-2">
-                            {item.bukuId ? (
-                              <Link
-                                href={`/koleksi/${encodeURIComponent(item.bukuId)}`}
-                                className="inline-flex h-9 items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 hover:bg-slate-50"
-                              >
-                                Lihat Detail
-                              </Link>
-                            ) : null}
-
-                            {item.digitalId ? (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleOpenDigital(item.digitalId!, item.judul)
-                                }
-                                disabled={openingDigitalId === item.digitalId}
-                                className={
-                                  "inline-flex h-9 items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-900 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                                }
-                              >
-                                {openingDigitalId === item.digitalId
-                                  ? "Membuka…"
-                                  : "Baca Digital"}
-                              </button>
-                            ) : null}
-
-                            {canRequestExtension ? (
-                              <button
-                                type="button"
-                                onClick={() => openPerpanjangan(item)}
-                                className={[
-                                  "inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-medium text-white",
-                                  "bg-gradient-to-r from-[#733015] to-[#8b5529]",
-                                  "hover:opacity-95",
-                                ].join(" ")}
-                              >
-                                <Calendar className="h-4 w-4" />
-                                Perpanjangan
-                              </button>
-                            ) : isPastDue ? (
-                              <div className="inline-flex max-w-full items-start gap-1.5 whitespace-normal text-xs text-rose-700">
-                                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                                <span>
-                                  Terlambat {overdueDays ?? 1} hari. Akan kena
-                                  denda jika tidak segera mengembalikan.
-                                </span>
-                              </div>
-                            ) : item.bukuId ? null : (
-                              <span className="text-slate-400">—</span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {totalItems > 0 && !loading && !error && token ? (
-            <div className="flex flex-col gap-4 border-t border-slate-200 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-sm text-slate-600">
-                Halaman{" "}
-                <span className="font-semibold text-slate-900">{page}</span>{" "}
-                dari{" "}
-                <span className="font-semibold text-slate-900">
-                  {totalPages}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className={[
-                    "px-3 py-2 rounded-lg border text-sm",
-                    "focus:outline-none focus:ring-2 focus:ring-[#733015]/20 focus:border-[#733015]",
-                    page <= 1
-                      ? "text-slate-400 border-slate-200 cursor-not-allowed"
-                      : "text-slate-700 hover:bg-slate-50",
-                  ].join(" ")}
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                >
-                  Sebelumnya
-                </button>
-
-                <div className="flex items-center gap-1">
-                  {pageNumbers.map((p) => {
-                    const isActive = p === page;
-                    return (
-                      <button
-                        key={p}
-                        type="button"
-                        className={[
-                          "min-w-10 px-3 py-2 rounded-lg text-sm border",
-                          "focus:outline-none focus:ring-2 focus:ring-[#733015]/20 focus:border-[#733015]",
-                          isActive
-                            ? "bg-slate-900 text-white border-slate-900"
-                            : "text-slate-700 hover:bg-slate-50",
-                        ].join(" ")}
-                        onClick={() => setPage(p)}
-                      >
-                        {p}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <button
-                  type="button"
-                  className={[
-                    "px-3 py-2 rounded-lg border text-sm",
-                    "focus:outline-none focus:ring-2 focus:ring-[#733015]/20 focus:border-[#733015]",
-                    page >= totalPages
-                      ? "text-slate-400 border-slate-200 cursor-not-allowed"
-                      : "text-slate-700 hover:bg-slate-50",
-                  ].join(" ")}
-                  disabled={page >= totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                >
-                  Berikutnya
-                </button>
-              </div>
-            </div>
-          ) : null}
-        </section>
-
+        {/* ── Modals ── */}
         <PerpanjanganModal
           open={perpanjanganOpen}
           judulBuku={perpanjanganLoan?.judul ?? ""}
@@ -1186,14 +1248,14 @@ export default function BorrowedBooksPage() {
 
         {digitalPreviewOpen ? (
           <div
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 px-4"
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
             role="dialog"
             aria-modal="true"
             onMouseDown={(e) => {
               if (e.target === e.currentTarget) closeDigitalPreview();
             }}
           >
-            <div className="w-full max-w-5xl rounded-2xl bg-white p-5 shadow-xl">
+            <div className="w-full max-w-5xl rounded-2xl bg-white p-5 shadow-2xl">
               <div className="mb-4 flex items-center justify-between">
                 <div>
                   <h3 className="text-base font-semibold text-slate-900">
@@ -1208,7 +1270,7 @@ export default function BorrowedBooksPage() {
                 <button
                   type="button"
                   onClick={closeDigitalPreview}
-                  className="text-slate-400 hover:text-slate-600"
+                  className="rounded-lg p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -1216,7 +1278,10 @@ export default function BorrowedBooksPage() {
 
               {digitalPreviewLoading ? (
                 <div className="flex h-[70vh] items-center justify-center text-sm text-slate-500">
-                  Memuat preview...
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-[#733015]" />
+                    Memuat preview...
+                  </div>
                 </div>
               ) : digitalPreviewSrc ? (
                 <iframe
